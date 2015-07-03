@@ -102,7 +102,7 @@ public class ConnectingState implements ClientState, IPendingWampConnectionListe
                 }
             });
         } catch (RejectedExecutionException e) {
-            connection.close(false, IWampConnectionPromise.Empty);
+            connection.close(false, IWampConnectionPromise.LogError);
         }
     }
     

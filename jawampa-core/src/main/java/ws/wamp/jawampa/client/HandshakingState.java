@@ -74,7 +74,7 @@ public class HandshakingState implements ClientState {
         // Send abort to the remote
         if (optAbortReason != null) {
             AbortMessage msg = new AbortMessage(null, optAbortReason);
-            connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+            connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
         }
         
         int nrReconnects = reconnectAllowed ? nrReconnectAttempts : 0;
@@ -122,7 +122,7 @@ public class HandshakingState implements ClientState {
         // However the WAMP session is not established until the handshake was finished
         
         connectionController
-        .sendMessage(new WampMessages.HelloMessage(stateController.clientConfig().realm(), stateController.clientConfig().helloDetails()), IWampConnectionPromise.Empty);
+        .sendMessage(new WampMessages.HelloMessage(stateController.clientConfig().realm(), stateController.clientConfig().helloDetails()), IWampConnectionPromise.LogError);
     }
     
     void onMessage(WampMessage msg) {
@@ -169,7 +169,7 @@ public class HandshakingState implements ClientState {
                     if (reply == null) {
                         handleProtocolError();
                     } else {
-                        connectionController.sendMessage(reply, IWampConnectionPromise.Empty);
+                        connectionController.sendMessage(reply, IWampConnectionPromise.LogError);
                     }
                     return;
                 }

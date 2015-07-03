@@ -56,5 +56,16 @@
             <artifactId>jackson-dataformat-msgpack</artifactId>
             <version>0.7.0-p7</version>
         </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.12</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>1.7.12</version>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 </project>
