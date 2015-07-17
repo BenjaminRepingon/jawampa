@@ -126,7 +126,7 @@ public class Request {
             @Override
             public void run() {
                 if (stateController.currentState() != session) return;
-                session.connectionController().sendMessage(msg, IWampConnectionPromise.Empty);
+                session.connectionController().sendMessage(msg, IWampConnectionPromise.LogError);
             }
         });
     }
@@ -149,7 +149,7 @@ public class Request {
             @Override
             public void run() {
                 if (stateController.currentState() != session) return;
-                session.connectionController().sendMessage(msg, IWampConnectionPromise.Empty);
+                session.connectionController().sendMessage(msg, IWampConnectionPromise.LogError);
             }
         });
     }

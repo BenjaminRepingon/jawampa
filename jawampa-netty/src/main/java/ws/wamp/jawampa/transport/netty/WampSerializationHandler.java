@@ -66,6 +66,7 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
             }
 
         } catch (Exception e) {
+            logger.error("error in serializing wampMessage", e);
             msgBuffer.release();
             return;
         }
