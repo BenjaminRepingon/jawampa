@@ -66,15 +66,12 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
     
     @Override
     public ScheduledExecutorService createScheduler() {
-        NioEventLoopGroup scheduler = new NioEventLoopGroup(1, new ThreadFactory() {
+        return new NioEventLoopGroup(1, new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "WampClientEventLoop");
-                t.setDaemon(true);
-                return t;
+                return new Thread(r, "WampClientEventLoop");
             }
         });
-        return scheduler;
     }
 
     @Override
