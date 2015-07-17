@@ -30,6 +30,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import rx.Observable;
 import rx.Scheduler;
 import rx.schedulers.Schedulers;
@@ -68,14 +69,14 @@ public class WampRouter {
         SUPPORTED_CLIENT_ROLES.add(WampRoles.Publisher);
         SUPPORTED_CLIENT_ROLES.add(WampRoles.Subscriber);
     }
-    
+
     /** Represents a realm that is exposed through the router */
-    static class Realm {
+    class Realm {
         final RealmConfig config;
         final ObjectNode welcomeDetails;
         final Map<Long, ClientHandler> channelsBySessionId = new HashMap<Long, ClientHandler>();
         final Map<String, Procedure> procedures = new HashMap<String, Procedure>();
-        
+
         // Fields that are used for implementing subscription functionality
         final EnumMap<SubscriptionFlags, Map<String, Subscription>> subscriptionsByFlags
                 = new EnumMap<SubscriptionFlags, Map<String, Subscription>>(SubscriptionFlags.class);
@@ -143,6 +144,12 @@ public class WampRouter {
                     proc.pendingCalls.clear();
                     // Remove the procedure from the realm
                     procedures.remove(proc.procName);
+
+                    long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+                    ArrayNode arguments = objectMapper.createArrayNode();
+                    arguments.add(proc.procName);
+                    PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options);
+                    publishEvent(channel.realm, null, pub, publicationId);
                 }
                 channel.providedProcedures = null;
                 channel.pendingInvocations = null;
@@ -158,19 +165,25 @@ public class WampRouter {
         }
     }
     
+    static interface MetaProcedure{
+        public ResultMessage getResultMessage(Realm realm, long requestId);
+    }
+
     static class Procedure {
         final String procName;
+        final ObjectNode options;
         final ClientHandler provider;
         final long registrationId;
         final List<Invocation> pendingCalls = new ArrayList<WampRouter.Invocation>();
         
-        public Procedure(String name, ClientHandler provider, long registrationId) {
+        public Procedure(String name, ObjectNode options, ClientHandler provider, long registrationId) {
             this.procName = name;
+            this.options = options;
             this.provider = provider;
             this.registrationId = registrationId;
         }
     }
-    
+
     static class Invocation {
         Procedure procedure;
         long callRequestId;
@@ -204,7 +217,8 @@ public class WampRouter {
     
     final Map<String, Realm> realms;
     final Set<IConnectionController> idleChannels;
-    
+    final Map<String, MetaProcedure> metaProcedures = new HashMap<String, MetaProcedure>();
+
     /** The number of connections that have to be closed. This is important for shutdown */
     int connectionsToClose = 0;
     
@@ -246,6 +260,17 @@ public class WampRouter {
         this.scheduler = Schedulers.from(eventLoop);
 
         idleChannels = new HashSet<IConnectionController>();
+
+        metaProcedures.put("wamp.procedure.list", new MetaProcedure() {
+            @Override
+            public ResultMessage getResultMessage(Realm realm, long requestId) {
+                ObjectNode kwArguments = objectMapper.createObjectNode();
+                for (Procedure procedure : realm.procedures.values()) {
+                    kwArguments.set(procedure.procName, procedure.options);
+                }
+                return new ResultMessage(requestId, null, null, kwArguments);
+            }
+        });
     }
     
     /**
@@ -485,7 +510,14 @@ public class WampRouter {
                 // Client sent an invalid request ID
                 err = ApplicationError.INVALID_ARGUMENT;
             }
-            
+
+            MetaProcedure metaProcedure = metaProcedures.get(call.procedure);
+            if (metaProcedure != null) {
+                ResultMessage result = metaProcedure.getResultMessage(handler.realm, call.requestId);
+                handler.controller.sendMessage(result, IWampConnectionPromise.Empty);
+                return;
+            }
+
             Procedure proc = null;
             if (err == null) {
                 proc = handler.realm.procedures.get(call.procedure);
@@ -589,7 +621,7 @@ public class WampRouter {
             // Everything checked, we can register the caller as the procedure provider
             long registrationId = IdGenerator.newLinearId(handler.lastUsedId, handler.providedProcedures);
             handler.lastUsedId = registrationId;
-            Procedure procInfo = new Procedure(reg.procedure, handler, registrationId);
+            Procedure procInfo = new Procedure(reg.procedure, reg.options, handler, registrationId);
             
             // Insert new procedure
             handler.realm.procedures.put(reg.procedure, procInfo);
@@ -601,6 +633,12 @@ public class WampRouter {
             
             RegisteredMessage response = new RegisteredMessage(reg.requestId, procInfo.registrationId);
             handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+
+            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+            ArrayNode arguments = objectMapper.createArrayNode();
+            arguments.add(procInfo.procName);
+            PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options);
+            publishEvent(handler.realm, null, pub, publicationId);
         } else if (msg instanceof UnregisterMessage) {
             // The client wants to unregister a procedure
             // Verify the message
@@ -655,6 +693,12 @@ public class WampRouter {
             // Send the acknowledge
             UnregisteredMessage response = new UnregisteredMessage(unreg.requestId);
             handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+
+            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+            ArrayNode arguments = objectMapper.createArrayNode();
+            arguments.add(proc.procName);
+            PublishMessage pub = new PublishMessage(unreg.requestId, null, "wamp.procedure.on_unregister", arguments, proc.options);
+            publishEvent(handler.realm, null, pub, publicationId);
         } else if (msg instanceof SubscribeMessage) {
             // The client wants to subscribe to a procedure
             // Verify the message
@@ -816,39 +860,7 @@ public class WampRouter {
             }
             
             long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
-
-            // Get the subscriptions for this topic on the realm
-            Subscription exactSubscription = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Exact).get(pub.topic);
-            if (exactSubscription != null) {
-                publishEvent(handler, pub, publicationId, exactSubscription);
-            }
-
-            Map<String, Subscription> prefixSubscriptionMap = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Prefix);
-            for (Subscription prefixSubscription : prefixSubscriptionMap.values()) {
-                if (pub.topic.startsWith(prefixSubscription.topic)) {
-                    publishEvent(handler, pub, publicationId, prefixSubscription);
-                }
-            }
-
-            Map<String, Subscription> wildcardSubscriptionMap = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Wildcard);
-            String[] components = pub.topic.split("\\.", -1);
-            for (Subscription wildcardSubscription : wildcardSubscriptionMap.values()) {
-                boolean matched = true;
-                if (components.length == wildcardSubscription.components.length) {
-                    for (int i=0; i < components.length; i++) {
-                        if (wildcardSubscription.components[i].length() > 0
-                                && !components[i].equals(wildcardSubscription.components[i])) {
-                            matched = false;
-                            break;
-                        }
-                    }
-                }else
-                    matched = false;
-
-                if (matched) {
-                    publishEvent(handler, pub, publicationId, wildcardSubscription);
-                }
-            }
+            publishEvent(handler.realm, handler, pub, publicationId);
 
             if (sendAcknowledge) {
                 PublishedMessage response = new PublishedMessage(pub.requestId, publicationId);
@@ -857,7 +869,42 @@ public class WampRouter {
         }
     }
 
-    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription){
+    private void publishEvent(Realm realm, ClientHandler publisher, PublishMessage pub, long publicationId) {
+        // Get the subscriptions for this topic on the realm
+        Subscription exactSubscription = realm.subscriptionsByFlags.get(SubscriptionFlags.Exact).get(pub.topic);
+        if (exactSubscription != null) {
+            publishEvent(publisher, pub, publicationId, exactSubscription);
+        }
+
+        Map<String, Subscription> prefixSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Prefix);
+        for (Subscription prefixSubscription : prefixSubscriptionMap.values()) {
+            if (pub.topic.startsWith(prefixSubscription.topic)) {
+                publishEvent(publisher, pub, publicationId, prefixSubscription);
+            }
+        }
+
+        Map<String, Subscription> wildcardSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Wildcard);
+        String[] components = pub.topic.split("\\.", -1);
+        for (Subscription wildcardSubscription : wildcardSubscriptionMap.values()) {
+            boolean matched = true;
+            if (components.length == wildcardSubscription.components.length) {
+                for (int i=0; i < components.length; i++) {
+                    if (wildcardSubscription.components[i].length() > 0
+                            && !components[i].equals(wildcardSubscription.components[i])) {
+                        matched = false;
+                        break;
+                    }
+                }
+            }else
+                matched = false;
+
+            if (matched) {
+                publishEvent(publisher, pub, publicationId, wildcardSubscription);
+            }
+        }
+    }
+
+    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription) {
         ObjectNode details = null;
         if (subscription.flags != SubscriptionFlags.Exact) {
             details = objectMapper.createObjectNode();
