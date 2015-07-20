@@ -468,7 +468,7 @@ public class SessionEstablishedState implements ClientState {
         connectionController.sendMessage(callMsg, IWampConnectionPromise.LogError);
     }
     
-    public void performRegisterProcedure(final String topic, final Subscriber<? super Request> subscriber) {
+    public void performRegisterProcedure(final String topic, ObjectNode options, final Subscriber<? super Request> subscriber) {
         // Check if we have already registered a function with the same name
         final RegisteredProceduresMapEntry entry = registeredProceduresByUri.get(topic);
         if (entry != null) {
@@ -485,7 +485,7 @@ public class SessionEstablishedState implements ClientState {
         // Make the subscribe call
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
-        final RegisterMessage msg = new RegisterMessage(requestId, null, topic);
+        final RegisterMessage msg = new RegisterMessage(requestId, options, topic);
 
         final AsyncSubject<Long> registerFuture = AsyncSubject.create();
         registerFuture

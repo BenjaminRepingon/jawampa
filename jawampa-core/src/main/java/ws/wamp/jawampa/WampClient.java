@@ -276,10 +276,11 @@ public class WampClient {
      * In case of errors during subscription onError will be called.
      * @param topic The name of the procedure which this client wants to
      * provide.<br>
+     * @param options additional options if any. <br>
      * Must be valid WAMP URI.
      * @return An observable that can be used to provide a procedure.
      */
-    public Observable<Request> registerProcedure(final String topic) {
+    public Observable<Request> registerProcedure(final String topic, final ObjectNode options) {
         return Observable.create(new OnSubscribe<Request>() {
             @Override
             public void call(final Subscriber<? super Request> subscriber) {
@@ -303,13 +304,17 @@ public class WampClient {
                         }
                         // Forward publish into the session
                         SessionEstablishedState curState = (SessionEstablishedState)stateController.currentState();
-                        curState.performRegisterProcedure(topic, subscriber);
+                        curState.performRegisterProcedure(topic, options, subscriber);
                     }
                 });
             }
         });
     }
-    
+
+    public Observable<Request> registerProcedure(final String topic) {
+        return registerProcedure(topic, null);
+    }
+
     /**
      * Returns an observable that allows to subscribe on the given topic.<br>
      * The actual subscription will only be made after subscribe() was called
