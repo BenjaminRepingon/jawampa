@@ -691,4 +691,7 @@ public class WampClient {
         return p.getFuture();
     }
 
+    public void submit(Runnable r){
+        stateController.scheduler().submit(r);
+    }
 }
