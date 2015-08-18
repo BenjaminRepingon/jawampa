@@ -68,7 +68,7 @@ public class RPCBenchmark{
         System.out.println("  requests: "+requests);
         System.out.println("   replies: "+replies);
         System.out.println("throughput: "+throughput+"/sec");
-        System.out.println("   latency: "+((float)latency/replies)+" sec");
+        System.out.println("   latency: "+(latency/replies)+" nanos");
         System.exit(0);
     }
 

@@ -74,7 +74,7 @@ public class PubSubBenchmark{
             System.out.println("subscriber["+i+"] ------------------------------");
             System.out.println("     recvd: "+recvd);
             System.out.println("throughput: "+throughput+"/sec");
-            System.out.println("   latency: "+((float)latency/recvd)+" sec");
+            System.out.println("   latency: "+((float)latency/recvd)+" nanos");
         }
         System.exit(0);
     }
