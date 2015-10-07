@@ -144,7 +144,7 @@ public class WampRouter {
                     ArrayNode arguments = objectMapper.createArrayNode();
                     arguments.add(proc.procName);
                     PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options);
-                    publishEvent(channel.realm, null, pub, publicationId);
+                    publishEvent(channel.realm, null, pub, publicationId, false);
                 }
                 channel.providedProcedures = null;
                 channel.pendingInvocations = null;
@@ -636,7 +636,7 @@ public class WampRouter {
             ArrayNode arguments = objectMapper.createArrayNode();
             arguments.add(procInfo.procName);
             PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options);
-            publishEvent(handler.realm, null, pub, publicationId);
+            publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof UnregisterMessage) {
             // The client wants to unregister a procedure
             // Verify the message
@@ -696,7 +696,7 @@ public class WampRouter {
             ArrayNode arguments = objectMapper.createArrayNode();
             arguments.add(proc.procName);
             PublishMessage pub = new PublishMessage(unreg.requestId, null, "wamp.procedure.on_unregister", arguments, proc.options);
-            publishEvent(handler.realm, null, pub, publicationId);
+            publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof SubscribeMessage) {
             // The client wants to subscribe to a procedure
             // Verify the message
@@ -833,10 +833,15 @@ public class WampRouter {
             // Check whether the client wants an acknowledgement for the publication
             // Default is no
             boolean sendAcknowledge = false;
+            boolean skipPublisher = true;
+
             JsonNode ackOption = pub.options.get("acknowledge");
             if (ackOption != null && ackOption.asBoolean() == true)
                 sendAcknowledge = true;
-            
+            JsonNode excludeMeNode = pub.options.get("exclude_me");
+            if (excludeMeNode != null)
+                skipPublisher = excludeMeNode.asBoolean(true);
+
             String err = null;
             if (!UriValidator.tryValidate(pub.topic, handler.realm.config.useStrictUriValidation)) {
                 // Client sent an invalid URI
@@ -858,7 +863,7 @@ public class WampRouter {
             }
             
             long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
-            publishEvent(handler.realm, handler, pub, publicationId);
+            publishEvent(handler.realm, handler, pub, publicationId, skipPublisher);
 
             if (sendAcknowledge) {
                 PublishedMessage response = new PublishedMessage(pub.requestId, publicationId);
@@ -867,17 +872,17 @@ public class WampRouter {
         }
     }
 
-    private void publishEvent(Realm realm, ClientHandler publisher, PublishMessage pub, long publicationId) {
+    private void publishEvent(Realm realm, ClientHandler publisher, PublishMessage pub, long publicationId, boolean skipPublisher) {
         // Get the subscriptions for this topic on the realm
         Subscription exactSubscription = realm.subscriptionsByFlags.get(SubscriptionFlags.Exact).get(pub.topic);
         if (exactSubscription != null) {
-            publishEvent(publisher, pub, publicationId, exactSubscription);
+            publishEvent(publisher, pub, publicationId, exactSubscription, skipPublisher);
         }
 
         Map<String, Subscription> prefixSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Prefix);
         for (Subscription prefixSubscription : prefixSubscriptionMap.values()) {
             if (pub.topic.startsWith(prefixSubscription.topic)) {
-                publishEvent(publisher, pub, publicationId, prefixSubscription);
+                publishEvent(publisher, pub, publicationId, prefixSubscription, skipPublisher);
             }
         }
 
@@ -897,12 +902,12 @@ public class WampRouter {
                 matched = false;
 
             if (matched) {
-                publishEvent(publisher, pub, publicationId, wildcardSubscription);
+                publishEvent(publisher, pub, publicationId, wildcardSubscription, skipPublisher);
             }
         }
     }
 
-    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription) {
+    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription, boolean skipPublisher) {
         ObjectNode details = null;
         if (subscription.flags != SubscriptionFlags.Exact) {
             details = objectMapper.createObjectNode();
@@ -913,15 +918,8 @@ public class WampRouter {
                 details, pub.arguments, pub.argumentsKw);
 
         for (ClientHandler receiver : subscription.subscribers) {
-            if (receiver == publisher ) { // Potentially skip the publisher
-                boolean skipPublisher = true;
-                if (pub.options != null) {
-                    JsonNode excludeMeNode = pub.options.get("exclude_me");
-                    if (excludeMeNode != null) {
-                        skipPublisher = excludeMeNode.asBoolean(true);
-                    }
-                }
-                if (skipPublisher) continue;
+            if (receiver == publisher && skipPublisher) { // Potentially skip the publisher
+                continue;
             }
 
             // Publish the event to the subscriber
