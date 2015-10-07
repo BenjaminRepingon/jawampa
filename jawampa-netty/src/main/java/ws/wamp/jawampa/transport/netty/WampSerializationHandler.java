@@ -18,6 +18,7 @@ package ws.wamp.jawampa.transport.netty;
 
 import java.util.List;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import ws.wamp.jawampa.WampMessages.WampMessage;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +40,7 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(WampSerializationHandler.class);
 
     final WampSerialization serialization;
+    final ArrayNode messageNode;
     
     public WampSerialization serialization() {
         return serialization;
@@ -46,6 +48,7 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
     
     public WampSerializationHandler(WampSerialization serialization) {
         this.serialization = serialization;
+        messageNode = serialization.getObjectMapper().createArrayNode();
     }
     
     @Override
@@ -58,15 +61,16 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
         ByteBufOutputStream outStream = new ByteBufOutputStream(msgBuffer);
         ObjectMapper objectMapper = serialization.getObjectMapper();
         try {
-            JsonNode node = msg.toObjectArray(objectMapper);
+            JsonNode node = msg.toObjectArray(messageNode);
             objectMapper.writeValue(outStream, node);
-
+            messageNode.removeAll();
             if (logger.isDebugEnabled()) {
                 logger.debug("Serialized Wamp Message: {}", node.toString());
             }
 
         } catch (Exception e) {
             logger.error("error in serializing wampMessage", e);
+            messageNode.removeAll();
             msgBuffer.release();
             return;
         }
