@@ -140,7 +140,7 @@ public class WampRouter {
                     // Remove the procedure from the realm
                     procedures.remove(proc.procName);
 
-                    long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+                    long publicationId = 0;// IdGenerator.newRandomId(null); // Store that somewhere?
                     ArrayNode arguments = objectMapper.createArrayNode();
                     arguments.add(proc.procName);
                     PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options);
@@ -632,7 +632,7 @@ public class WampRouter {
             RegisteredMessage response = new RegisteredMessage(reg.requestId, procInfo.registrationId);
             handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
 
-            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+            long publicationId = 0; // IdGenerator.newRandomId(null); // Store that somewhere?
             ArrayNode arguments = objectMapper.createArrayNode();
             arguments.add(procInfo.procName);
             PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options);
@@ -862,7 +862,7 @@ public class WampRouter {
                 return;
             }
             
-            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+            long publicationId = 0;//IdGenerator.newRandomId(null); // Store that somewhere?
             publishEvent(handler.realm, handler, pub, publicationId, skipPublisher);
 
             if (sendAcknowledge) {
