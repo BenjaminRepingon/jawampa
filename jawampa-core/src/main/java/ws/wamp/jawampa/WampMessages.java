@@ -32,6 +32,7 @@ public class WampMessages {
      * Base class for all messages
      */
     public static abstract class WampMessage {
+        protected static final ObjectNode emptyObject = JsonNodeFactory.instance.objectNode();
 
         public abstract JsonNode toObjectArray(ObjectMapper mapper)
                 throws WampError;
@@ -114,7 +115,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -154,7 +155,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -194,7 +195,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(reason);
             return messageNode;
         }
@@ -236,7 +237,7 @@ public class WampMessages {
             if (extra != null)
                 messageNode.add(extra);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -277,7 +278,7 @@ public class WampMessages {
             if (extra != null)
                 messageNode.add(extra);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -317,7 +318,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(reason);
             return messageNode;
         }
@@ -374,7 +375,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(error);
             if (arguments != null)
                 messageNode.add(arguments);
@@ -450,7 +451,7 @@ public class WampMessages {
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(topic);
             if (arguments != null)
                 messageNode.add(arguments);
@@ -563,7 +564,7 @@ public class WampMessages {
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(topic);
             return messageNode;
         }
@@ -732,7 +733,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
@@ -805,7 +806,7 @@ public class WampMessages {
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(procedure);
             if (arguments != null)
                 messageNode.add(arguments);
@@ -877,7 +878,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
@@ -941,7 +942,7 @@ public class WampMessages {
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(procedure);
             return messageNode;
         }
@@ -1111,7 +1112,7 @@ public class WampMessages {
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
@@ -1182,7 +1183,7 @@ public class WampMessages {
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
