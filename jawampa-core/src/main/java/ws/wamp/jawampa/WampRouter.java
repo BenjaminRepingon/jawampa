@@ -38,15 +38,7 @@ import rx.Scheduler;
 import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import ws.wamp.jawampa.WampMessages.*;
-import ws.wamp.jawampa.connection.ICompletionCallback;
-import ws.wamp.jawampa.connection.IConnectionController;
-import ws.wamp.jawampa.connection.IWampConnection;
-import ws.wamp.jawampa.connection.IWampConnectionAcceptor;
-import ws.wamp.jawampa.connection.IWampConnectionFuture;
-import ws.wamp.jawampa.connection.IWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampConnectionPromise;
-import ws.wamp.jawampa.connection.QueueingConnectionController;
-import ws.wamp.jawampa.connection.WampConnectionPromise;
+import ws.wamp.jawampa.connection.*;
 import ws.wamp.jawampa.internal.IdGenerator;
 import ws.wamp.jawampa.internal.IdValidator;
 import ws.wamp.jawampa.internal.RealmConfig;
@@ -367,7 +359,7 @@ public class WampRouter {
         @Override
         public IWampConnectionListener createNewConnectionListener() {
             ClientHandler newHandler = new ClientHandler();
-            IConnectionController newController = new QueueingConnectionController(eventLoop, newHandler);
+            IConnectionController newController = new ServerConnectionController(eventLoop, newHandler);
             newHandler.controller = newController;
             return newController;
         }
@@ -380,14 +372,14 @@ public class WampRouter {
                     @Override
                     public void run() {
                         if (connectionListener == null
-                                || !(connectionListener instanceof QueueingConnectionController)
+                                || !(connectionListener instanceof IConnectionController)
                                 || newConnection == null) {
                             // This is always true if the transport provider does not manipulate the structure
                             // that was sent by the router
                             if (newConnection != null) newConnection.close(false, IWampConnectionPromise.LogError);
                             return;
                         }
-                        QueueingConnectionController controller = (QueueingConnectionController)connectionListener;
+                        IConnectionController controller = (IConnectionController)connectionListener;
                         controller.setConnection(newConnection);
                         
                         if (isDisposed) {

@@ -45,5 +45,11 @@
       <artifactId>jawampa-netty</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-jdk14</artifactId>
+      <version>1.7.12</version>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
 </project>
