@@ -57,7 +57,7 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
 
     @Override
     protected void encode(ChannelHandlerContext ctx, WampMessage msg, List<Object> out) throws Exception {
-        ByteBuf msgBuffer = Unpooled.buffer();
+        ByteBuf msgBuffer = ctx.alloc().buffer();
         ByteBufOutputStream outStream = new ByteBufOutputStream(msgBuffer);
         ObjectMapper objectMapper = serialization.getObjectMapper();
         try {

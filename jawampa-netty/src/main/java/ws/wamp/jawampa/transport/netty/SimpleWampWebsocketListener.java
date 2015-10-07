@@ -21,20 +21,14 @@ import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.*;
 import ws.wamp.jawampa.ApplicationError;
 import ws.wamp.jawampa.WampRouter;
 import ws.wamp.jawampa.WampSerialization;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -132,6 +126,7 @@ public class SimpleWampWebsocketListener {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, clientGroup)
              .channel(NioServerSocketChannel.class)
+             .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
              .childHandler(new WebSocketServerInitializer(uri, sslCtx));
             
             channel = b.bind(uri.getHost(), port).sync().channel();
