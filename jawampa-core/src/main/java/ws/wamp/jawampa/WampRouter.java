@@ -887,9 +887,9 @@ public class WampRouter {
         }
 
         Map<String, Subscription> wildcardSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Wildcard);
-        String[] components = pub.topic.split("\\.", -1);
         for (Subscription wildcardSubscription : wildcardSubscriptionMap.values()) {
             boolean matched = true;
+            String[] components = pub.getComponents();
             if (components.length == wildcardSubscription.components.length) {
                 for (int i=0; i < components.length; i++) {
                     if (wildcardSubscription.components[i].length() > 0

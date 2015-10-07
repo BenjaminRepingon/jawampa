@@ -452,6 +452,13 @@ public class WampMessages {
             return messageNode;
         }
 
+        private String components[];
+        public String[] getComponents(){
+            if(components==null)
+                components = topic.split("\\.", -1);
+            return components;
+        }
+
         static class Factory implements WampMessageFactory {
             @Override
             public WampMessage fromObjectArray(ArrayNode messageNode) throws WampError {
