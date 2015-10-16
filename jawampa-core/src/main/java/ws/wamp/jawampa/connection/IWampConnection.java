@@ -50,6 +50,8 @@ public interface IWampConnection {
      * the message was sent or when an error occured during sending.
      */
     void sendMessage(WampMessage message, IWampConnectionPromise<Void> promise);
+
+    void flush();
     
     /**
      * Close the connection independent of it's current state.<br>

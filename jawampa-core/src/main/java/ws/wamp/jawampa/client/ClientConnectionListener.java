@@ -42,6 +42,11 @@ class ClientConnectionListener implements IWampConnectionListener {
     }
 
     @Override
+    public void readCompleted(){
+
+    }
+
+    @Override
     public void transportClosed() {
         // Remark: No need to check for connection. The controller guarantees that after close()
         // messages will no longer be forwarded

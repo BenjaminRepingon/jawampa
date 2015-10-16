@@ -148,9 +148,14 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
         
         @Override
         public void sendMessage(WampMessage message, final IWampConnectionPromise<Void> promise) {
-            ctx.writeAndFlush(message, voidPromise);
+            ctx.write(message, voidPromise);
         }
-        
+
+        @Override
+        public void flush(){
+            ctx.flush();
+        }
+
         @Override
         public void close(boolean sendRemaining, final IWampConnectionPromise<Void> promise) {
             ctx.close(voidPromise);
@@ -238,6 +243,11 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, WampMessage msg) throws Exception {
                     connectionListener.messageReceived(msg);
+                }
+
+                @Override
+                public void channelReadComplete(ChannelHandlerContext ctx) throws Exception{
+                    connectionListener.readCompleted();
                 }
 
                 @Override

@@ -270,4 +270,14 @@ public class QueueingConnectionController implements IConnectionController {
             }
         });
     }
+
+    @Override
+    public void readCompleted(){
+
+    }
+
+    @Override
+    public void flush(){
+        connection.flush();
+    }
 }

@@ -204,7 +204,12 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                                             }
                                         });
                                     }
-                                    
+
+                                    @Override
+                                    public void flush(){
+                                        ctx.flush();
+                                    }
+
                                     @Override
                                     public void close(boolean sendRemaining, final IWampConnectionPromise<Void> promise) {
                                         // sendRemaining is ignored. Remaining data is always sent

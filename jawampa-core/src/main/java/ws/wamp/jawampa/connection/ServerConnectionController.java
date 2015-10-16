@@ -19,6 +19,7 @@ package ws.wamp.jawampa.connection;
 import ws.wamp.jawampa.WampMessages.WampMessage;
 import ws.wamp.jawampa.WampSerialization;
 
+import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -52,10 +53,13 @@ public class ServerConnectionController implements IConnectionController {
     boolean forwardIncoming = true;
     CloseStatus closeStatus = CloseStatus.None;
 
+    private List<IWampConnection> flushList;
+
     public ServerConnectionController(ScheduledExecutorService scheduler,
-                                      IWampConnectionListener connectionListener) {
+                                      IWampConnectionListener connectionListener, List<IWampConnection> flushList) {
         this.scheduler = scheduler;
         this.connectionListener = connectionListener;
+        this.flushList = flushList;
     }
     
     @Override
@@ -105,6 +109,8 @@ public class ServerConnectionController implements IConnectionController {
             throw new IllegalStateException("close() was already called");
 
         connection.sendMessage(message, promise);
+        if(!flushList.contains(connection))
+            flushList.add(connection);
     }
 
     @Override
@@ -164,5 +170,23 @@ public class ServerConnectionController implements IConnectionController {
                 connectionListener.messageReceived(message);
             }
         });
+    }
+
+    @Override
+    public void readCompleted(){
+        tryScheduleAction(new Runnable() {
+            @Override
+            public void run() {
+                for(IWampConnection connection : flushList){
+                    connection.flush();
+                }
+                flushList.clear();
+            }
+        });
+    }
+
+    @Override
+    public void flush(){
+        connection.flush();
     }
 }

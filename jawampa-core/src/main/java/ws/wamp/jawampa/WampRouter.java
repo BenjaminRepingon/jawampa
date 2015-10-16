@@ -354,12 +354,13 @@ public class WampRouter {
         Open,
         Closed
     }
-    
+
+    private List<IWampConnection> flushList = new ArrayList<IWampConnection>();
     IWampConnectionAcceptor connectionAcceptor = new IWampConnectionAcceptor() {
         @Override
         public IWampConnectionListener createNewConnectionListener() {
             ClientHandler newHandler = new ClientHandler();
-            IConnectionController newController = new ServerConnectionController(eventLoop, newHandler);
+            IConnectionController newController = new ServerConnectionController(eventLoop, newHandler, flushList);
             newHandler.controller = newController;
             return newController;
         }
@@ -472,6 +473,11 @@ public class WampRouter {
             } else {
                 onMessageFromRegisteredChannel(ClientHandler.this, message);
             }
+        }
+
+        @Override
+        public void readCompleted(){
+
         }
     }
     
@@ -836,8 +842,8 @@ public class WampRouter {
             boolean skipPublisher = true;
 
             JsonNode ackOption = pub.options.get("acknowledge");
-            if (ackOption != null && ackOption.asBoolean() == true)
-                sendAcknowledge = true;
+            if (ackOption != null)
+                sendAcknowledge = ackOption.asBoolean(false);
             JsonNode excludeMeNode = pub.options.get("exclude_me");
             if (excludeMeNode != null)
                 skipPublisher = excludeMeNode.asBoolean(true);
