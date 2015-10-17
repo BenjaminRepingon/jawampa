@@ -19,7 +19,6 @@ package ws.wamp.jawampa.connection;
 import ws.wamp.jawampa.WampMessages.WampMessage;
 import ws.wamp.jawampa.WampSerialization;
 
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class ClientConnectionController implements IConnectionController {
@@ -70,21 +69,7 @@ public class ClientConnectionController implements IConnectionController {
         this.connection = connection;
     }
     
-    /**
-     * Tries to schedule a runnable on the underlying executor.<br>
-     * Rejected executions will be suppressed.<br>
-     * This is useful for cases when the clients EventLoop is shut down before
-     * the EventLoop of the underlying connection.
-     * 
-     * @param action The action to schedule.
-     */
-    private void tryScheduleAction(Runnable action) {
-        try {
-            scheduler.submit(action);
-        } catch (RejectedExecutionException e) {}
-    }
-    
-    // IWampConnection members 
+    // IWampConnection members
     
     @Override
     public WampSerialization serialization() {
