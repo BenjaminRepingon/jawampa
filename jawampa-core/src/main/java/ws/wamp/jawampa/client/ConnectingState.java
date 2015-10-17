@@ -19,12 +19,7 @@ package ws.wamp.jawampa.client;
 import java.util.concurrent.RejectedExecutionException;
 
 import ws.wamp.jawampa.WampClient;
-import ws.wamp.jawampa.connection.IConnectionController;
-import ws.wamp.jawampa.connection.IPendingWampConnection;
-import ws.wamp.jawampa.connection.IPendingWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampConnection;
-import ws.wamp.jawampa.connection.IWampConnectionPromise;
-import ws.wamp.jawampa.connection.QueueingConnectionController;
+import ws.wamp.jawampa.connection.*;
 
 /** The session is trying to connect to the router */
 public class ConnectingState implements ClientState, IPendingWampConnectionListener {
@@ -57,7 +52,7 @@ public class ConnectingState implements ClientState, IPendingWampConnectionListe
         
         // Starts an connection attempt to the router
         connectionController =
-            new QueueingConnectionController(stateController.scheduler(), new ClientConnectionListener(stateController));
+            new ClientConnectionController(stateController.scheduler(), new ClientConnectionListener(stateController));
         
         try {
             connectingCon =
