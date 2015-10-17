@@ -16,26 +16,13 @@
 
 package ws.wamp.jawampa.connection;
 
-import ws.wamp.jawampa.ApplicationError;
 import ws.wamp.jawampa.WampMessages.WampMessage;
 import ws.wamp.jawampa.WampSerialization;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class ClientConnectionController implements IConnectionController {
-
-    static class QueuedMessage {
-        public final WampMessage message;
-        public final IWampConnectionPromise<Void> promise;
-
-        public QueuedMessage(WampMessage message, IWampConnectionPromise<Void> promise) {
-            this.message = message;
-            this.promise = promise;
-        }
-    }
 
     /** Possible states while closing the connection */
     enum CloseStatus {
@@ -51,97 +38,12 @@ public class ClientConnectionController implements IConnectionController {
         Closed
     }
 
-    final ICompletionCallback<Void> messageSentHandler = new ICompletionCallback<Void> () {
-        @Override
-        public void onCompletion(final IWampConnectionFuture<Void> future) {
-            tryScheduleAction(new Runnable() {
-                @Override
-                public void run() {
-                    // Dequeue the first element of the queue.
-                    // Queue might be empty if closed in between
-                    QueuedMessage first = queuedMessages.poll();
-                    if (future.isSuccess())
-                        first.promise.fulfill(null);
-                    else {
-                        first.promise.reject(future.error());
-                    }
-
-                    /** Whether to close after this call */
-                    boolean sendClose =
-                        (closeStatus == CloseStatus.CloseNow) ||
-                        (closeStatus == CloseStatus.CloseAfterRemaining && queuedMessages.size() == 0);
-
-                    if (sendClose) {
-                        // Close the connection now
-                        closeStatus = CloseStatus.CloseSent;
-                        connection.close(true, connectionClosedPromise);
-                    } else if (queuedMessages.size() >= 1) {
-                        // There's more to send
-                        WampMessage nextMessage = queuedMessages.peek().message;
-                        messageSentPromise.reset(messageSentHandler, null);
-                        connection.sendMessage(nextMessage, messageSentPromise);
-                    }
-                }
-            });
-        }
-    };
-
-    final ICompletionCallback<Void> connectionClosedHandler = new ICompletionCallback<Void> () {
-        @Override
-        public void onCompletion(final IWampConnectionFuture<Void> future) {
-            tryScheduleAction(new Runnable() {
-                @Override
-                public void run() {
-                    assert (closeStatus == CloseStatus.CloseSent);
-                    // The connection is now finally closed
-                    closeStatus = CloseStatus.Closed;
-
-                    // Complete all pending sends
-                    while (queuedMessages.size() > 0) {
-                        QueuedMessage nextMessage = queuedMessages.remove();
-                        nextMessage.promise.reject(
-                            new ApplicationError(ApplicationError.TRANSPORT_CLOSED));
-                        // This could theoretically cause side effects.
-                        // However it is not valid to call anything on the controller after
-                        // close() anyway, so it isn't valid.
-                    }
-
-                    // Forward the result
-                    if (future.isSuccess()) queuedClose.fulfill(null);
-                    else queuedClose.reject(future.error());
-                    queuedClose = null;
-                }
-            });
-        }
-    };
-
-    /**
-     * Promise that will be fulfilled when the underlying connection
-     * has sent a single message. The promise will be reused for
-     * all messages that will be sent through this controller.
-     */
-    final WampConnectionPromise<Void> messageSentPromise =
-        new WampConnectionPromise<Void>(messageSentHandler, null);
-
-    /**
-     * Promise that will be fulfilled when the connection was closed
-     * and the close was acknowledged by the underlying connection.
-     */
-    final WampConnectionPromise<Void> connectionClosedPromise =
-        new WampConnectionPromise<Void>(connectionClosedHandler, null);
-
-
     /** The scheduler on which all state transitions will run */
     final ScheduledExecutorService scheduler;
     /** The wrapped connection object. Must be injected later due to Router design */
     IWampConnection connection;
     /** The wrapped listener object */
     final IWampConnectionListener connectionListener;
-
-    /** Queued messages */
-    Deque<QueuedMessage> queuedMessages = new ArrayDeque<QueuedMessage>();
-    /** Holds the promise that will be fulfilled when the connection was closed */
-    IWampConnectionPromise<Void> queuedClose = null;
 
     /** Whether to forward incoming messages or not */
     boolean forwardIncoming = true;
@@ -198,15 +100,8 @@ public class ClientConnectionController implements IConnectionController {
     public void sendMessage(WampMessage message, IWampConnectionPromise<Void> promise) {
         if (closeStatus != CloseStatus.None)
             throw new IllegalStateException("close() was already called");
-        
-        queuedMessages.add(new QueuedMessage(message, promise));
-        
-        // Check if there is already a send in progress
-        if (queuedMessages.size() == 1) {
-            // We are first in queue. Send immediately
-            messageSentPromise.reset(messageSentHandler, null);
-            connection.sendMessage(message, messageSentPromise);
-        }
+
+        connection.sendMessage(message, promise);
     }
 
     @Override
@@ -216,16 +111,13 @@ public class ClientConnectionController implements IConnectionController {
         // Mark as closed. No other actions allowed after that
         if (sendRemaining) closeStatus = CloseStatus.CloseAfterRemaining;
         else closeStatus = CloseStatus.CloseNow;
-        queuedClose = promise;
-        
+
         // Avoid forwarding of new incoming messages
         forwardIncoming = false;
-        
-        if (queuedMessages.size() == 0) {
-            // Can immediately start to close
-            closeStatus = CloseStatus.CloseSent;
-            connection.close(true, connectionClosedPromise);
-        }
+
+        // Can immediately start to close
+        closeStatus = CloseStatus.CloseSent;
+        connection.close(true, promise);
     }
     
     // IWampConnectionListener methods
