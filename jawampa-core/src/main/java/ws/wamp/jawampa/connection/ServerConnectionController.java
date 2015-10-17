@@ -46,9 +46,6 @@ public class ServerConnectionController implements IConnectionController {
     /** The wrapped listener object */
     final IWampConnectionListener connectionListener;
 
-    /** Holds the promise that will be fulfilled when the connection was closed */
-    IWampConnectionPromise<Void> queuedClose = null;
-
     /** Whether to forward incoming messages or not */
     boolean forwardIncoming = true;
     CloseStatus closeStatus = CloseStatus.None;
@@ -120,8 +117,7 @@ public class ServerConnectionController implements IConnectionController {
         // Mark as closed. No other actions allowed after that
         if (sendRemaining) closeStatus = CloseStatus.CloseAfterRemaining;
         else closeStatus = CloseStatus.CloseNow;
-        queuedClose = promise;
-        
+
         // Avoid forwarding of new incoming messages
         forwardIncoming = false;
 
