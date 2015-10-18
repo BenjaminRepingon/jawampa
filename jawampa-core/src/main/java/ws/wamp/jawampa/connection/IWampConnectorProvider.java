@@ -32,7 +32,7 @@ public interface IWampConnectorProvider {
      * The scheduler is suitable as a scheduler for the client transports which
      * are created by the factory
      */
-    ScheduledExecutorService createScheduler();
+    IScheduler createScheduler();
     
     /**
      * Create a connector that can be used by a client to connect to a server later on.

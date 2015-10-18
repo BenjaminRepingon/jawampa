@@ -459,11 +459,10 @@ public class SessionEstablishedState implements ClientState {
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
         
-        ObjectNode options = stateController.clientConfig().objectMapper().createObjectNode();
-        
-        boolean discloseMe = flags != null && flags.contains(CallFlags.DiscloseMe) ? true : false;
-        if (discloseMe) {
-            options.put("disclose_me", discloseMe);
+        ObjectNode options = null;
+        if(flags!=null && flags.contains(CallFlags.DiscloseMe)){
+            options = stateController.clientConfig().objectMapper().createObjectNode();
+            options.put("disclose_me", true);
         }
         
         final CallMessage callMsg = new CallMessage(requestId, options, procedure, 

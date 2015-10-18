@@ -17,7 +17,6 @@
 package ws.wamp.jawampa.client;
 
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 
 import rx.Observable;
 import rx.Scheduler;
@@ -27,6 +26,7 @@ import ws.wamp.jawampa.WampClient;
 import ws.wamp.jawampa.WampClient.DisconnectedState;
 import ws.wamp.jawampa.WampClient.State;
 import ws.wamp.jawampa.WampMessages.WampMessage;
+import ws.wamp.jawampa.connection.IScheduler;
 
 public class StateController {
     private boolean isCompleted = false;
@@ -34,7 +34,7 @@ public class StateController {
     private ClientState currentState = new InitialState(this);
     private ClientConfiguration clientConfig;
     
-    private final ScheduledExecutorService scheduler;
+    private final IScheduler scheduler;
     private final Scheduler rxScheduler;
     
     /** The current externally visible status */
@@ -47,14 +47,14 @@ public class StateController {
     public StateController(ClientConfiguration clientConfig) {
         this.clientConfig = clientConfig;
         this.scheduler = clientConfig.connectorProvider.createScheduler();
-        this.rxScheduler = Schedulers.from(scheduler);
+        this.rxScheduler = Schedulers.from(scheduler.getExecutor());
     }
     
     public ClientConfiguration clientConfig() {
         return clientConfig;
     }
     
-    public ScheduledExecutorService scheduler() {
+    public IScheduler scheduler() {
         return scheduler;
     }
     
@@ -83,7 +83,7 @@ public class StateController {
      */
     public void tryScheduleAction(Runnable action) {
         try {
-            scheduler.submit(action);
+            scheduler.execute(action);
         } catch (RejectedExecutionException e) {}
     }
 

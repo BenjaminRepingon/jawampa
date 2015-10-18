@@ -38,7 +38,7 @@ public class ClientConnectionController implements IConnectionController {
     }
 
     /** The scheduler on which all state transitions will run */
-    final ScheduledExecutorService scheduler;
+    final IScheduler scheduler;
     /** The wrapped connection object. Must be injected later due to Router design */
     IWampConnection connection;
     /** The wrapped listener object */
@@ -48,7 +48,7 @@ public class ClientConnectionController implements IConnectionController {
     boolean forwardIncoming = true;
     CloseStatus closeStatus = CloseStatus.None;
 
-    public ClientConnectionController(ScheduledExecutorService scheduler,
+    public ClientConnectionController(IScheduler scheduler,
                                       IWampConnectionListener connectionListener) {
         this.scheduler = scheduler;
         this.connectionListener = connectionListener;

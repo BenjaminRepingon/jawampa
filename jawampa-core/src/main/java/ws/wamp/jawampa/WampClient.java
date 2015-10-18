@@ -246,7 +246,7 @@ public class WampClient {
             return resultSubject;
         }
          
-        stateController.scheduler().execute(new Runnable() {
+        stateController.scheduler().submit(new Runnable() {
             @Override
             public void run() {
                 if (!(stateController.currentState() instanceof SessionEstablishedState)) {
@@ -692,6 +692,6 @@ public class WampClient {
     }
 
     public void submit(Runnable r){
-        stateController.scheduler().submit(r);
+        stateController.scheduler().execute(r);
     }
 }

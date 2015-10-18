@@ -23,27 +23,13 @@ import java.util.concurrent.ThreadFactory;
 
 import javax.net.ssl.SSLException;
 
+import io.netty.channel.*;
 import ws.wamp.jawampa.ApplicationError;
 import ws.wamp.jawampa.WampMessages.WampMessage;
-import ws.wamp.jawampa.connection.IPendingWampConnection;
-import ws.wamp.jawampa.connection.IPendingWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampClientConnectionConfig;
-import ws.wamp.jawampa.connection.IWampConnection;
-import ws.wamp.jawampa.connection.IWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampConnectionPromise;
-import ws.wamp.jawampa.connection.IWampConnector;
-import ws.wamp.jawampa.connection.IWampConnectorProvider;
+import ws.wamp.jawampa.connection.*;
 import ws.wamp.jawampa.WampSerialization;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -65,13 +51,8 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 public class NettyWampClientConnectorProvider implements IWampConnectorProvider {
     
     @Override
-    public ScheduledExecutorService createScheduler() {
-        return new NioEventLoopGroup(1, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r, "WampClientEventLoop");
-            }
-        });
+    public IScheduler createScheduler() {
+        return new NettyScheduler();
     }
 
     @Override
@@ -123,10 +104,10 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
             // Return a factory that creates a channel for websocket connections
             return new IWampConnector() {
                 @Override
-                public IPendingWampConnection connect(final ScheduledExecutorService scheduler,
+                public IPendingWampConnection connect(final IScheduler scheduler,
                         final IPendingWampConnectionListener connectListener,
                         final IWampConnectionListener connectionListener) {
-                    
+                    final NettyScheduler nettyScheduler = (NettyScheduler) scheduler;
                     // Use well-known ports if not explicitly specified
                     final int port;
                     if (uri.getPort() == -1) {
@@ -143,13 +124,23 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                      * events from the pipeline.
                      * A new instance of this is created for each connection attempt.
                      */
-                    final ChannelHandler connectionHandler = new SimpleChannelInboundHandler<WampMessage>() {
+                    final ChannelInboundHandler connectionHandler = new SimpleChannelInboundHandler<WampMessage>() {
                         boolean connectionWasEstablished = false;
                         /** Guard to prevent forwarding events aftert the channel was closed */
                         boolean wasClosed = false;
-                        
+                        ChannelHandlerContext ctx;
+                        ChannelPromise voidPromise;
+
+                        @Override
+                        public void channelActive(ChannelHandlerContext ctx) throws Exception{
+                            this.ctx = ctx;
+                            voidPromise = ctx.channel().voidPromise();
+                            super.channelActive(ctx);
+                        }
+
                         @Override
                         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                            this.ctx = null;
                             if (wasClosed) return;
                             wasClosed = true;
                             if (connectionWasEstablished) {
@@ -193,16 +184,10 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                                     
                                     @Override
                                     public void sendMessage(WampMessage message, final IWampConnectionPromise<Void> promise) {
-                                        ChannelFuture f = ctx.writeAndFlush(message);
-                                        f.addListener(new ChannelFutureListener() {
-                                            @Override
-                                            public void operationComplete(ChannelFuture future) throws Exception {
-                                                if (future.isSuccess() || future.isCancelled())
-                                                    promise.fulfill(null);
-                                                else
-                                                    promise.reject(future.cause());
-                                            }
-                                        });
+                                        if(nettyScheduler.writing)
+                                            ctx.write(message, voidPromise);
+                                        else
+                                            ctx.writeAndFlush(message, voidPromise);
                                     }
 
                                     @Override
@@ -247,12 +232,50 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                             assert (connectionWasEstablished);
                             connectionListener.messageReceived(msg);
                         }
+
+                        @Override
+                        public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception{
+                            if(nettyScheduler.writing)
+                                return;
+                            nettyScheduler.writing = true;
+                            try{
+                                ctx = this.ctx;
+                                while(true){
+                                    Runnable runnable = nettyScheduler.queue.poll();
+                                    if(runnable==null){
+                                        ctx.flush();
+                                        break;
+                                    }
+                                    runnable.run();
+                                    if(!ctx.channel().isWritable()){
+                                        ctx.flush();
+                                        if(!ctx.channel().isWritable())
+                                            break;
+                                    }
+                                }
+                            }finally{
+                                nettyScheduler.writeInProgress.set(!ctx.channel().isWritable());
+                                nettyScheduler.writing = false;
+                            }
+                        }
                     };
-                    
+
+                    nettyScheduler.writeTask = new Runnable(){
+                        @Override
+                        public void run(){
+                            try{
+                                connectionHandler.channelWritabilityChanged(null);
+                            }catch(Exception e){
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+
                     // If the assigned scheduler is a netty eventloop use this
                     final EventLoopGroup nettyEventLoop;
-                    if (scheduler instanceof EventLoopGroup) {
-                        nettyEventLoop = (EventLoopGroup)scheduler;
+
+                    if (scheduler.getExecutor() instanceof EventLoopGroup) {
+                        nettyEventLoop = (EventLoopGroup)scheduler.getExecutor();
                     } else {
                         connectListener.connectFailed(new ApplicationError(ApplicationError.INCOMATIBLE_SCHEDULER));
                         return IPendingWampConnection.Dummy;
