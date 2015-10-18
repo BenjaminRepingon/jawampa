@@ -421,18 +421,23 @@ public class SessionEstablishedState implements ClientState {
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
 
-        ObjectNode options = stateController.clientConfig().objectMapper().createObjectNode();
-        if (flags != null && flags.contains(PublishFlags.DontExcludeMe)) {
-            options.put("exclude_me", false);
+        boolean acknowledge = false;
+        ObjectNode options = null;
+        if(flags!=null){
+            options = stateController.clientConfig().objectMapper().createObjectNode();
+            if (flags.contains(PublishFlags.DontExcludeMe))
+                options.put("exclude_me", false);
+            if (flags.contains(PublishFlags.RequireAcknowledge)) {
+                // An acknowledge from the router in the form of a PUBLISHED or ERROR message
+                // is expected. The request is stored in the requestMap and the resultSubject will be
+                // completed once a response was received.
+                acknowledge = true;
+                options.put("acknowledge", true);
+                requestMap.put(requestId, new RequestMapEntry(WampMessages.PublishMessage.ID, resultSubject));
+            }
         }
-        
-        if (flags != null && flags.contains(PublishFlags.RequireAcknowledge)) {
-            // An acknowledge from the router in the form of a PUBLISHED or ERROR message
-            // is expected. The request is stored in the requestMap and the resultSubject will be
-            // completed once a response was received.
-            options.put("acknowledge", true);
-            requestMap.put(requestId, new RequestMapEntry(WampMessages.PublishMessage.ID, resultSubject));
-        } else {
+
+        if(!acknowledge){
             // No acknowledge will be sent from the router.
             // Treat the publish as a success
             resultSubject.onNext(0L);
