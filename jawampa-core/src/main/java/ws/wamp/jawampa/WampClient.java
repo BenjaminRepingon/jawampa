@@ -261,7 +261,26 @@ public class WampClient {
         });
         return resultSubject;
     }
-    
+
+    public void publishMessage(final String topic, final ArrayNode arguments, final ObjectNode argumentsKw)
+    {
+        final AsyncSubject<Long> resultSubject = AsyncSubject.create();
+
+        stateController.scheduler().submit(new Runnable() {
+            @Override
+            public void run() {
+                if (!(stateController.currentState() instanceof SessionEstablishedState)) {
+                    resultSubject.onError(new ApplicationError(ApplicationError.NOT_CONNECTED));
+                    return;
+                }
+                // Forward publish into the session
+                SessionEstablishedState curState = (SessionEstablishedState)stateController.currentState();
+                curState.performPublishMessage(topic, arguments, argumentsKw);
+
+            }
+        });
+    }
+
     /**
      * Registers a procedure at the router which will afterwards be available
      * for remote procedure calls from other clients.<br>

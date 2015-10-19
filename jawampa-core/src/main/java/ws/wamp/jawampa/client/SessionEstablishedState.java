@@ -450,6 +450,18 @@ public class SessionEstablishedState implements ClientState {
         connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
     }
     
+    public void performPublishMessage(final String topic, final ArrayNode arguments,
+        final ObjectNode argumentsKw)
+    {
+        final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
+        lastRequestId = requestId;
+
+        final WampMessages.PublishMessage msg =
+            new WampMessages.PublishMessage(requestId, null, topic, arguments, argumentsKw);
+
+        connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
+    }
+
     public void performCall(final String procedure,
             final EnumSet<CallFlags> flags,
             final ArrayNode arguments,
