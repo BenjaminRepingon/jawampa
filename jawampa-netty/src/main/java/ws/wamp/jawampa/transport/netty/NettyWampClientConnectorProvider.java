@@ -23,6 +23,7 @@ import java.util.concurrent.ThreadFactory;
 
 import javax.net.ssl.SSLException;
 
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.*;
 import ws.wamp.jawampa.ApplicationError;
 import ws.wamp.jawampa.WampMessages.WampMessage;
@@ -284,24 +285,25 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                     Bootstrap b = new Bootstrap();
                     b.group(nettyEventLoop)
                      .channel(NioSocketChannel.class)
-                     .handler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel ch) {
-                        ChannelPipeline p = ch.pipeline();
-                        if (sslCtx0 != null) {
-                            p.addLast(sslCtx0.newHandler(ch.alloc(),
-                                                         uri.getHost(),
-                                                         port));
-                        }
-                        p.addLast(
-                            new HttpClientCodec(),
-                            new HttpObjectAggregator(8192),
-                            new WebSocketClientProtocolHandler(handshaker, false),
-                            new WebSocketFrameAggregator(WampHandlerConfiguration.MAX_WEBSOCKET_FRAME_SIZE),
-                            new WampClientWebsocketHandler(handshaker),
-                            connectionHandler);
-                        }
-                    });
+                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                     .handler(new ChannelInitializer<SocketChannel>(){
+                         @Override
+                         protected void initChannel(SocketChannel ch){
+                             ChannelPipeline p = ch.pipeline();
+                             if(sslCtx0 != null){
+                                 p.addLast(sslCtx0.newHandler(ch.alloc(),
+                                         uri.getHost(),
+                                         port));
+                             }
+                             p.addLast(
+                                     new HttpClientCodec(),
+                                     new HttpObjectAggregator(8192),
+                                     new WebSocketClientProtocolHandler(handshaker, false),
+                                     new WebSocketFrameAggregator(WampHandlerConfiguration.MAX_WEBSOCKET_FRAME_SIZE),
+                                     new WampClientWebsocketHandler(handshaker),
+                                     connectionHandler);
+                         }
+                     });
                     
                     final ChannelFuture connectFuture = b.connect(uri.getHost(), port);
                     connectFuture.addListener(new ChannelFutureListener() {
