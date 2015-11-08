@@ -26,6 +26,11 @@ public class NettyScheduler implements IScheduler{
     }
 
     @Override
+    public boolean isEventThread(){
+        return executor.next().inEventLoop();
+    }
+
+    @Override
     public void execute(Runnable runnable){
         executor.execute(runnable);
     }

@@ -710,6 +710,10 @@ public class WampClient {
         return p.getFuture();
     }
 
+    public boolean isEventThread(){
+        return stateController.scheduler().isEventThread();
+    }
+    
     public void submit(Runnable r){
         stateController.scheduler().execute(r);
     }

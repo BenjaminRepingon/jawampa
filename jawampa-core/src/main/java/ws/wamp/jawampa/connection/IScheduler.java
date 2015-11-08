@@ -7,6 +7,7 @@ import java.util.concurrent.Executor;
  */
 public interface IScheduler{
     public Executor getExecutor();
+    public boolean isEventThread();
     public void execute(Runnable runnable);
     public void submit(Runnable runnable);
     public void shutdown();
