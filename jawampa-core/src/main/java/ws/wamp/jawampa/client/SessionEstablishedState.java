@@ -191,8 +191,8 @@ public class SessionEstablishedState implements ClientState {
         clearSessionData();
         
         WaitingForDisconnectState newState = new WaitingForDisconnectState(stateController, nrReconnectAttempts);
-        connectionController.close(true, newState.closePromise());
         stateController.setState(newState);
+        connectionController.close(true, newState.closePromise());
     }
     
     void clearSessionData() {
