@@ -16,6 +16,8 @@
 
 package ws.wamp.jawampa;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -54,6 +57,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * protocol.<br>
  */
 public class WampRouter {
+    public static final String OPTIONS_DIR = "persistentDir";
     private final static Logger logger = LoggerFactory.getLogger(WampRouter.class);
     
     final static Set<WampRoles> SUPPORTED_CLIENT_ROLES;
@@ -143,7 +147,7 @@ public class WampRouter {
                     long publicationId = 0;// IdGenerator.newRandomId(null); // Store that somewhere?
                     ArrayNode arguments = objectMapper.createArrayNode();
                     arguments.add(proc.procName);
-                    PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options);
+                    PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options());
                     publishEvent(channel.realm, null, pub, publicationId, false);
                 }
                 channel.providedProcedures = null;
@@ -166,16 +170,40 @@ public class WampRouter {
 
     static class Procedure {
         final String procName;
-        final ObjectNode options;
+        private final File optionsFile;
         final ClientHandler provider;
         final long registrationId;
         final List<Invocation> pendingCalls = new ArrayList<WampRouter.Invocation>();
         
         public Procedure(String name, ObjectNode options, ClientHandler provider, long registrationId) {
             this.procName = name;
-            this.options = options;
             this.provider = provider;
             this.registrationId = registrationId;
+
+            if(options==null)
+                optionsFile = null;
+            else{
+                File optionsDir = new File(System.getProperty(OPTIONS_DIR, "."), "procedures");
+                optionsDir.mkdirs();
+                try{
+                    optionsFile = File.createTempFile("procedure", ".json", optionsDir);
+                    optionsFile.deleteOnExit();
+                    new ObjectMapper().writeValue(optionsFile, options);
+                }catch(IOException e){
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        public ObjectNode options(){
+            try{
+                if(optionsFile==null)
+                    return JsonNodeFactory.instance.objectNode();
+                else
+                    return (ObjectNode)new ObjectMapper().readTree(optionsFile);
+            }catch(IOException e){
+                throw new RuntimeException(e);
+            }
         }
     }
     
@@ -235,7 +263,7 @@ public class WampRouter {
     }
 
     WampRouter(Map<String, RealmConfig> realms) {
-        
+
         // Populate the realms from the configuration
         this.realms = new HashMap<String, Realm>();
         for (Map.Entry<String, RealmConfig> e : realms.entrySet()) {
@@ -261,7 +289,7 @@ public class WampRouter {
             public ResultMessage getResultMessage(Realm realm, long requestId) {
                 ObjectNode kwArguments = objectMapper.createObjectNode();
                 for (Procedure procedure : realm.procedures.values()) {
-                    kwArguments.set(procedure.procName, procedure.options);
+                    kwArguments.set(procedure.procName, procedure.options());
                 }
                 return new ResultMessage(requestId, null, null, kwArguments);
             }
@@ -641,7 +669,7 @@ public class WampRouter {
             long publicationId = 0; // IdGenerator.newRandomId(null); // Store that somewhere?
             ArrayNode arguments = objectMapper.createArrayNode();
             arguments.add(procInfo.procName);
-            PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options);
+            PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options());
             publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof UnregisterMessage) {
             // The client wants to unregister a procedure
@@ -701,7 +729,7 @@ public class WampRouter {
             long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
             ArrayNode arguments = objectMapper.createArrayNode();
             arguments.add(proc.procName);
-            PublishMessage pub = new PublishMessage(unreg.requestId, null, "wamp.procedure.on_unregister", arguments, proc.options);
+            PublishMessage pub = new PublishMessage(unreg.requestId, null, "wamp.procedure.on_unregister", arguments, proc.options());
             publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof SubscribeMessage) {
             // The client wants to subscribe to a procedure
