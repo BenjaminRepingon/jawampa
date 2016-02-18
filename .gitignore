@@ -7,3 +7,10 @@
 
 # Eclipse
 /.settings
+
+# Gradle
+local.properties
+.gradle
+wrapper
+settings.gradle
+build

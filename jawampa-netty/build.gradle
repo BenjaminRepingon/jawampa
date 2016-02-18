@@ -1,0 +1,6 @@
+
+description = 'jawampa-netty'
+dependencies {
+  compile project(':jawampa:jawampa-core')
+    compile group: 'io.netty', name: 'netty-codec-http', version:'4.0.24.Final'
+}
