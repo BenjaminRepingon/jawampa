@@ -673,6 +673,9 @@ public class SessionEstablishedState implements ClientState {
         subscriber.add(Subscriptions.create(new Action0() {
             @Override
             public void call() {
+                if (stateController.scheduler().isShutdown()) {
+                    return;
+                }
                 stateController.scheduler().execute(new Runnable() {
                     @Override
                     public void run() {
