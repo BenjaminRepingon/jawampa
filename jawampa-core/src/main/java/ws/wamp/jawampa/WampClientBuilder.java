@@ -16,6 +16,7 @@
 
 package ws.wamp.jawampa;
 
+import java.net.SocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -51,6 +52,8 @@ public class WampClientBuilder {
     
     IWampClientConnectionConfig connectionConfiguration = null;
     IWampConnectorProvider connectorProvider = null;
+
+    SocketAddress proxyAddress = null;
     
     /** The default reconnect interval in milliseconds.<br>This is set to 5s */
     public static final int DEFAULT_RECONNECT_INTERVAL = 5000;
@@ -121,7 +124,7 @@ public class WampClientBuilder {
         // Build a connector that can be used by the client afterwards
         // This can throw!
         IWampConnector connector =
-            connectorProvider.createConnector(routerUri, connectionConfiguration, serializations);
+            connectorProvider.createConnector(routerUri, connectionConfiguration, serializations, proxyAddress);
         
         ClientConfiguration clientConfig =
             new ClientConfiguration(
@@ -181,7 +184,12 @@ public class WampClientBuilder {
         this.connectorProvider = provider;
         return this;
     }
-    
+
+    public WampClientBuilder withProxyAddress(SocketAddress proxyAddress) {
+        this.proxyAddress = proxyAddress;
+        return this;
+    }
+
     /**
      * Assigns additional configuration data for a connection that should be used.<br>
      * The type of this configuration data depends on the used {@link IWampConnectorProvider}.<br>

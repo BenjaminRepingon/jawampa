@@ -16,6 +16,8 @@
 
 package ws.wamp.jawampa.transport.netty;
 
+import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,6 +57,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketClientProtocolHandler;
 import io.netty.handler.codec.http.websocketx.WebSocketFrameAggregator;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
@@ -63,7 +66,7 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
  * clients and routers.<br>
  */
 public class NettyWampClientConnectorProvider implements IWampConnectorProvider {
-    
+
     @Override
     public ScheduledExecutorService createScheduler() {
         NioEventLoopGroup scheduler = new NioEventLoopGroup(1, new ThreadFactory() {
@@ -80,7 +83,9 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
     @Override
     public IWampConnector createConnector(final URI uri,
             IWampClientConnectionConfig configuration,
-            List<WampSerialization> serializations) throws Exception {
+            List<WampSerialization> serializations,
+            final SocketAddress proxyAddress) throws Exception {
+
         String scheme = uri.getScheme();
         scheme = scheme != null ? scheme : "";
         
@@ -263,6 +268,9 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                         @Override
                         protected void initChannel(SocketChannel ch) {
                         ChannelPipeline p = ch.pipeline();
+                        if (proxyAddress != null) {
+                            p.addLast(new HttpProxyHandler(proxyAddress));
+                        }
                         if (sslCtx0 != null) {
                             p.addLast(sslCtx0.newHandler(ch.alloc(),
                                                          uri.getHost(),

@@ -16,6 +16,7 @@
 
 package ws.wamp.jawampa.connection;
 
+import java.net.SocketAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,5 +48,6 @@ public interface IWampConnectorProvider {
      */
     IWampConnector createConnector(URI uri,
                                    IWampClientConnectionConfig configuration,
-                                   List<WampSerialization> serializations) throws Exception;
+                                   List<WampSerialization> serializations,
+                                   SocketAddress proxyAddress) throws Exception;
 }
