@@ -1,7 +1,9 @@
 package ws.wamp.jawampa.connection;
 
-public interface IWampConnectionPromise<T> extends IWampConnectionFuture<T> {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+public interface IWampConnectionPromise<T> extends IWampConnectionFuture<T> {
     void fulfill(T value);
 
     void reject(Throwable error);
@@ -14,7 +16,9 @@ public interface IWampConnectionPromise<T> extends IWampConnectionFuture<T> {
      * A default implementation of the promise whose instance methods do nothing.<br>
      * Can be used in cases where the caller is not interested in the call results.
      */
-    public static final IWampConnectionPromise<Void> Empty = new IWampConnectionPromise<Void>() {
+    public static final IWampConnectionPromise<Void> LogError = new IWampConnectionPromise<Void>() {
+        private final Logger logger = LoggerFactory.getLogger(IWampConnectionPromise.class);
+
         @Override
         public Void result() {
             return null;
@@ -32,7 +36,7 @@ public interface IWampConnectionPromise<T> extends IWampConnectionFuture<T> {
 
         @Override
         public void reject(Throwable error) {
-            
+            logger.error("promise rejected", error);
         }
 
         @Override

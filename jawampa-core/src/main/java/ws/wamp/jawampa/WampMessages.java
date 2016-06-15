@@ -23,6 +23,7 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class WampMessages {
@@ -31,8 +32,10 @@ public class WampMessages {
      * Base class for all messages
      */
     public static abstract class WampMessage {
+        protected static final ObjectNode emptyObject = JsonNodeFactory.instance.objectNode();
+        protected static final ArrayNode emptyArray = JsonNodeFactory.instance.arrayNode();
 
-        public abstract JsonNode toObjectArray(ObjectMapper mapper)
+        public abstract JsonNode toObjectArray(ArrayNode messageNode)
                 throws WampError;
 
         public static WampMessage fromObjectArray(ArrayNode messageNode)
@@ -97,6 +100,7 @@ public class WampMessages {
      */
     public static class HelloMessage extends WampMessage {
         public final static int ID = 1;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public String realm;
         public ObjectNode details;
 
@@ -105,14 +109,13 @@ public class WampMessages {
             this.details = details;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(realm);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -136,6 +139,7 @@ public class WampMessages {
      */
     public static class WelcomeMessage extends WampMessage {
         public final static int ID = 2;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long sessionId;
         public ObjectNode details;
 
@@ -144,14 +148,13 @@ public class WampMessages {
             this.details = details;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(sessionId);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -176,6 +179,7 @@ public class WampMessages {
      */
     public static class AbortMessage extends WampMessage {
         public final static int ID = 3;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public ObjectNode details;
         public String reason;
 
@@ -184,13 +188,12 @@ public class WampMessages {
             this.reason = reason;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(reason);
             return messageNode;
         }
@@ -216,6 +219,7 @@ public class WampMessages {
      */
     public static class ChallengeMessage extends WampMessage {
         public final static int ID = 4;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public String authMethod;
         public ObjectNode extra;
 
@@ -224,14 +228,13 @@ public class WampMessages {
             this.extra = extra;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(authMethod);
             if (extra != null)
                 messageNode.add(extra);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -256,6 +259,7 @@ public class WampMessages {
      */
     public static class AuthenticateMessage extends WampMessage {
         public final static int ID = 5;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public String signature;
         public ObjectNode extra;
 
@@ -264,14 +268,13 @@ public class WampMessages {
             this.extra = extra;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(signature);
             if (extra != null)
                 messageNode.add(extra);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             return messageNode;
         }
 
@@ -296,6 +299,7 @@ public class WampMessages {
      */
     public static class GoodbyeMessage extends WampMessage {
         public final static int ID = 6;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public ObjectNode details;
         public String reason;
 
@@ -304,13 +308,12 @@ public class WampMessages {
             this.reason = reason;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(reason);
             return messageNode;
         }
@@ -340,6 +343,7 @@ public class WampMessages {
      */
     public static class ErrorMessage extends WampMessage {
         public final static int ID = 8;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public int requestType;
         public long requestId;
         public ObjectNode details;
@@ -358,20 +362,19 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestType);
             messageNode.add(requestId);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(error);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
@@ -419,6 +422,7 @@ public class WampMessages {
      */
     public static class PublishMessage extends WampMessage {
         public final static int ID = 16;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode options;
         public String topic;
@@ -434,22 +438,28 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(topic);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
+        }
+
+        private String components[];
+        public String[] getComponents(){
+            if(components==null)
+                components = topic.split("\\.", -1);
+            return components;
         }
 
         static class Factory implements WampMessageFactory {
@@ -490,6 +500,7 @@ public class WampMessages {
      */
     public static class PublishedMessage extends WampMessage {
         public final static int ID = 17;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long publicationId;
 
@@ -498,9 +509,8 @@ public class WampMessages {
             this.publicationId = publicationId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(publicationId);
             return messageNode;
@@ -528,6 +538,7 @@ public class WampMessages {
      */
     public static class SubscribeMessage extends WampMessage {
         public final static int ID = 32;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode options;
         public String topic;
@@ -538,14 +549,13 @@ public class WampMessages {
             this.topic = topic;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(topic);
             return messageNode;
         }
@@ -574,6 +584,7 @@ public class WampMessages {
      */
     public static class SubscribedMessage extends WampMessage {
         public final static int ID = 33;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long subscriptionId;
 
@@ -582,9 +593,8 @@ public class WampMessages {
             this.subscriptionId = subscriptionId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(subscriptionId);
             return messageNode;
@@ -612,6 +622,7 @@ public class WampMessages {
      */
     public static class UnsubscribeMessage extends WampMessage {
         public final static int ID = 34;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long subscriptionId;
 
@@ -620,9 +631,8 @@ public class WampMessages {
             this.subscriptionId = subsriptionId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(subscriptionId);
             return messageNode;
@@ -650,15 +660,15 @@ public class WampMessages {
      */
     public static class UnsubscribedMessage extends WampMessage {
         public final static int ID = 35;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
 
         public UnsubscribedMessage(long requestId) {
             this.requestId = requestId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             return messageNode;
         }
@@ -687,6 +697,7 @@ public class WampMessages {
      */
     public static class EventMessage extends WampMessage {
         public final static int ID = 36;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long subscriptionId;
         public long publicationId;
         public ObjectNode details;
@@ -702,19 +713,18 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(subscriptionId);
             messageNode.add(publicationId);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
@@ -760,6 +770,7 @@ public class WampMessages {
      */
     public static class CallMessage extends WampMessage {
         public final static int ID = 48;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode options;
         public String procedure;
@@ -775,19 +786,18 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(procedure);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
@@ -833,6 +843,7 @@ public class WampMessages {
      */
     public static class ResultMessage extends WampMessage {
         public final static int ID = 50;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode details;
         public ArrayNode arguments;
@@ -846,18 +857,17 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
@@ -899,6 +909,7 @@ public class WampMessages {
      */
     public static class RegisterMessage extends WampMessage {
         public final static int ID = 64;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode options;
         public String procedure;
@@ -909,14 +920,13 @@ public class WampMessages {
             this.procedure = procedure;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             messageNode.add(procedure);
             return messageNode;
         }
@@ -945,6 +955,7 @@ public class WampMessages {
      */
     public static class RegisteredMessage extends WampMessage {
         public final static int ID = 65;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long registrationId;
 
@@ -953,9 +964,8 @@ public class WampMessages {
             this.registrationId = registrationId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(registrationId);
             return messageNode;
@@ -984,6 +994,7 @@ public class WampMessages {
      */
     public static class UnregisterMessage extends WampMessage {
         public final static int ID = 66;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long registrationId;
 
@@ -992,9 +1003,8 @@ public class WampMessages {
             this.registrationId = registrationId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(registrationId);
             return messageNode;
@@ -1023,15 +1033,15 @@ public class WampMessages {
      */
     public static class UnregisteredMessage extends WampMessage {
         public final static int ID = 67;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
 
         public UnregisteredMessage(long requestId) {
             this.requestId = requestId;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             return messageNode;
         }
@@ -1059,6 +1069,7 @@ public class WampMessages {
      */
     public static class InvocationMessage extends WampMessage {
         public final static int ID = 68;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public long registrationId;
         public ObjectNode details;
@@ -1074,19 +1085,18 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             messageNode.add(registrationId);
             if (details != null)
                 messageNode.add(details);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;
@@ -1132,6 +1142,7 @@ public class WampMessages {
      */
     public static class YieldMessage extends WampMessage {
         public final static int ID = 70;
+        private final static JsonNode ID_NODE = JsonNodeFactory.instance.numberNode(ID);
         public long requestId;
         public ObjectNode options;
         public ArrayNode arguments;
@@ -1145,18 +1156,17 @@ public class WampMessages {
             this.argumentsKw = argumentsKw;
         }
 
-        public JsonNode toObjectArray(ObjectMapper mapper) throws WampError {
-            ArrayNode messageNode = mapper.createArrayNode();
-            messageNode.add(ID);
+        public JsonNode toObjectArray(ArrayNode messageNode) throws WampError {
+            messageNode.add(ID_NODE);
             messageNode.add(requestId);
             if (options != null)
                 messageNode.add(options);
             else
-                messageNode.add(mapper.createObjectNode());
+                messageNode.add(emptyObject);
             if (arguments != null)
                 messageNode.add(arguments);
             else if (argumentsKw != null)
-                messageNode.add(mapper.createArrayNode());
+                messageNode.add(emptyArray);
             if (argumentsKw != null)
                 messageNode.add(argumentsKw);
             return messageNode;

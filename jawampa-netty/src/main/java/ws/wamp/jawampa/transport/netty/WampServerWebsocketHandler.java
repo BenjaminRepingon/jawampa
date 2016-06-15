@@ -16,14 +16,9 @@
 
 package ws.wamp.jawampa.transport.netty;
 
+import io.netty.channel.*;
 import ws.wamp.jawampa.WampRouter;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -135,6 +130,7 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
         
         final WampSerialization serialization; 
         ChannelHandlerContext ctx;
+        ChannelPromise voidPromise;
         
         public WampServerConnection(WampSerialization serialization) {
             this.serialization = serialization;
@@ -152,37 +148,17 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
         
         @Override
         public void sendMessage(WampMessage message, final IWampConnectionPromise<Void> promise) {
-            ChannelFuture f = ctx.writeAndFlush(message);
-            f.addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    if (future.isSuccess() || future.isCancelled())
-                        promise.fulfill(null);
-                    else
-                        promise.reject(future.cause());
-                }
-            });
+            ctx.write(message, voidPromise);
         }
-        
+
+        @Override
+        public void flush(){
+            ctx.flush();
+        }
+
         @Override
         public void close(boolean sendRemaining, final IWampConnectionPromise<Void> promise) {
-            ctx.writeAndFlush(Unpooled.EMPTY_BUFFER)
-            .addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    future.channel()
-                        .close()
-                        .addListener(new ChannelFutureListener() {
-                        @Override
-                        public void operationComplete(ChannelFuture future) throws Exception {
-                            if (future.isSuccess() || future.isCancelled())
-                                promise.fulfill(null);
-                            else
-                                promise.reject(future.cause());
-                        }
-                    });
-                }
-            });
+            ctx.close(voidPromise);
         }
     }
     
@@ -251,6 +227,7 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
                 public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
                     // Gets called once the channel gets added to the pipeline
                     connection.ctx = ctx;
+                    connection.voidPromise = ctx.voidPromise();
                 }
                  
                 @Override
@@ -267,7 +244,12 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
                 protected void channelRead0(ChannelHandlerContext ctx, WampMessage msg) throws Exception {
                     connectionListener.messageReceived(msg);
                 }
-                 
+
+                @Override
+                public void channelReadComplete(ChannelHandlerContext ctx) throws Exception{
+                    connectionListener.readCompleted();
+                }
+
                 @Override
                 public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                     ctx.close();

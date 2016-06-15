@@ -32,4 +32,6 @@ public interface IWampConnectionListener {
     
     /** A message is received from the WAMP connection */
     void messageReceived(WampMessage message);
+
+    void readCompleted();
 }

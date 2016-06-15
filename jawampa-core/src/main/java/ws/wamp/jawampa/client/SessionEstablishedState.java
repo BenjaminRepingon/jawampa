@@ -178,7 +178,7 @@ public class SessionEstablishedState implements ClientState {
         // Send goodbye message with close reason to the remote
         if (optCloseMessageReason != null) {
             GoodbyeMessage msg = new GoodbyeMessage(null, optCloseMessageReason);
-            connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+            connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
         }
         
         stateController.setExternalState(new WampClient.DisconnectedState(disconnectReason));
@@ -191,8 +191,8 @@ public class SessionEstablishedState implements ClientState {
         clearSessionData();
         
         WaitingForDisconnectState newState = new WaitingForDisconnectState(stateController, nrReconnectAttempts);
-        connectionController.close(true, newState.closePromise());
         stateController.setState(newState);
+        connectionController.close(true, newState.closePromise());
     }
     
     void clearSessionData() {
@@ -402,7 +402,7 @@ public class SessionEstablishedState implements ClientState {
                 connectionController.sendMessage(
                     new ErrorMessage(InvocationMessage.ID, m.requestId, null,
                                      ApplicationError.NO_SUCH_PROCEDURE, null, null),
-                    IWampConnectionPromise.Empty);
+                    IWampConnectionPromise.LogError);
             }
             else {
                 // Send the request to the subscriber, which can then send responses
@@ -421,18 +421,23 @@ public class SessionEstablishedState implements ClientState {
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
 
-        ObjectNode options = stateController.clientConfig().objectMapper().createObjectNode();
-        if (flags != null && flags.contains(PublishFlags.DontExcludeMe)) {
-            options.put("exclude_me", false);
+        boolean acknowledge = false;
+        ObjectNode options = null;
+        if(flags!=null){
+            options = stateController.clientConfig().objectMapper().createObjectNode();
+            if (flags.contains(PublishFlags.DontExcludeMe))
+                options.put("exclude_me", false);
+            if (flags.contains(PublishFlags.RequireAcknowledge)) {
+                // An acknowledge from the router in the form of a PUBLISHED or ERROR message
+                // is expected. The request is stored in the requestMap and the resultSubject will be
+                // completed once a response was received.
+                acknowledge = true;
+                options.put("acknowledge", true);
+                requestMap.put(requestId, new RequestMapEntry(WampMessages.PublishMessage.ID, resultSubject));
+            }
         }
-        
-        if (flags != null && flags.contains(PublishFlags.RequireAcknowledge)) {
-            // An acknowledge from the router in the form of a PUBLISHED or ERROR message
-            // is expected. The request is stored in the requestMap and the resultSubject will be
-            // completed once a response was received.
-            options.put("acknowledge", true);
-            requestMap.put(requestId, new RequestMapEntry(WampMessages.PublishMessage.ID, resultSubject));
-        } else {
+
+        if(!acknowledge){
             // No acknowledge will be sent from the router.
             // Treat the publish as a success
             resultSubject.onNext(0L);
@@ -442,9 +447,21 @@ public class SessionEstablishedState implements ClientState {
         final WampMessages.PublishMessage msg =
             new WampMessages.PublishMessage(requestId, options, topic, arguments, argumentsKw);
         
-        connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+        connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
     }
     
+    public void performPublishMessage(final String topic, final ArrayNode arguments,
+        final ObjectNode argumentsKw)
+    {
+        final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
+        lastRequestId = requestId;
+
+        final WampMessages.PublishMessage msg =
+            new WampMessages.PublishMessage(requestId, null, topic, arguments, argumentsKw);
+
+        connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
+    }
+
     public void performCall(final String procedure,
             final EnumSet<CallFlags> flags,
             final ArrayNode arguments,
@@ -454,21 +471,20 @@ public class SessionEstablishedState implements ClientState {
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
         
-        ObjectNode options = stateController.clientConfig().objectMapper().createObjectNode();
-        
-        boolean discloseMe = flags != null && flags.contains(CallFlags.DiscloseMe) ? true : false;
-        if (discloseMe) {
-            options.put("disclose_me", discloseMe);
+        ObjectNode options = null;
+        if(flags!=null && flags.contains(CallFlags.DiscloseMe)){
+            options = stateController.clientConfig().objectMapper().createObjectNode();
+            options.put("disclose_me", true);
         }
         
         final CallMessage callMsg = new CallMessage(requestId, options, procedure, 
                                               arguments, argumentsKw);
         
         requestMap.put(requestId, new RequestMapEntry(CallMessage.ID, resultSubject));
-        connectionController.sendMessage(callMsg, IWampConnectionPromise.Empty);
+        connectionController.sendMessage(callMsg, IWampConnectionPromise.LogError);
     }
     
-    public void performRegisterProcedure(final String topic, final Subscriber<? super Request> subscriber) {
+    public void performRegisterProcedure(final String topic, ObjectNode options, final Subscriber<? super Request> subscriber) {
         // Check if we have already registered a function with the same name
         final RegisteredProceduresMapEntry entry = registeredProceduresByUri.get(topic);
         if (entry != null) {
@@ -485,7 +501,7 @@ public class SessionEstablishedState implements ClientState {
         // Make the subscribe call
         final long requestId = IdGenerator.newLinearId(lastRequestId, requestMap);
         lastRequestId = requestId;
-        final RegisterMessage msg = new RegisterMessage(requestId, null, topic);
+        final RegisterMessage msg = new RegisterMessage(requestId, options, topic);
 
         final AsyncSubject<Long> registerFuture = AsyncSubject.create();
         registerFuture
@@ -526,7 +542,7 @@ public class SessionEstablishedState implements ClientState {
 
         requestMap.put(requestId, 
             new RequestMapEntry(RegisterMessage.ID, registerFuture));
-        connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+        connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
     }
     
     /**
@@ -573,7 +589,7 @@ public class SessionEstablishedState implements ClientState {
                         
                         requestMap.put(requestId, new RequestMapEntry(
                             UnregisterMessage.ID, unregisterFuture));
-                        connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+                        connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
                     }
                 });
             }
@@ -657,7 +673,7 @@ public class SessionEstablishedState implements ClientState {
             requestMap.put(requestId, 
                     new RequestMapEntry(SubscribeMessage.ID, 
                             subscribeFuture));
-            connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+            connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
         }
     }
     
@@ -712,7 +728,7 @@ public class SessionEstablishedState implements ClientState {
                             
                             requestMap.put(requestId, new RequestMapEntry(
                                 UnsubscribeMessage.ID, unsubscribeFuture));
-                            connectionController.sendMessage(msg, IWampConnectionPromise.Empty);
+                            connectionController.sendMessage(msg, IWampConnectionPromise.LogError);
                         }
                     }
                 });

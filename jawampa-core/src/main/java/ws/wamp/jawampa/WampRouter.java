@@ -16,6 +16,8 @@
 
 package ws.wamp.jawampa;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -30,20 +32,16 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import rx.Observable;
 import rx.Scheduler;
 import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import ws.wamp.jawampa.WampMessages.*;
-import ws.wamp.jawampa.connection.ICompletionCallback;
-import ws.wamp.jawampa.connection.IConnectionController;
-import ws.wamp.jawampa.connection.IWampConnection;
-import ws.wamp.jawampa.connection.IWampConnectionAcceptor;
-import ws.wamp.jawampa.connection.IWampConnectionFuture;
-import ws.wamp.jawampa.connection.IWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampConnectionPromise;
-import ws.wamp.jawampa.connection.QueueingConnectionController;
-import ws.wamp.jawampa.connection.WampConnectionPromise;
+import ws.wamp.jawampa.connection.*;
 import ws.wamp.jawampa.internal.IdGenerator;
 import ws.wamp.jawampa.internal.IdValidator;
 import ws.wamp.jawampa.internal.RealmConfig;
@@ -59,6 +57,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * protocol.<br>
  */
 public class WampRouter {
+    public static final String OPTIONS_DIR = "persistentDir";
+    private final static Logger logger = LoggerFactory.getLogger(WampRouter.class);
     
     final static Set<WampRoles> SUPPORTED_CLIENT_ROLES;
     static {
@@ -68,9 +68,9 @@ public class WampRouter {
         SUPPORTED_CLIENT_ROLES.add(WampRoles.Publisher);
         SUPPORTED_CLIENT_ROLES.add(WampRoles.Subscriber);
     }
-    
+
     /** Represents a realm that is exposed through the router */
-    static class Realm {
+    class Realm {
         final RealmConfig config;
         final ObjectNode welcomeDetails;
         final Map<Long, ClientHandler> channelsBySessionId = new HashMap<Long, ClientHandler>();
@@ -138,11 +138,17 @@ public class WampRouter {
                         if (invoc.caller.state != RouterHandlerState.Open) continue;
                         ErrorMessage errMsg = new ErrorMessage(CallMessage.ID, invoc.callRequestId, 
                             null, ApplicationError.NO_SUCH_PROCEDURE, null, null);
-                        invoc.caller.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                        invoc.caller.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                     }
                     proc.pendingCalls.clear();
                     // Remove the procedure from the realm
                     procedures.remove(proc.procName);
+
+                    long publicationId = 0;// IdGenerator.newRandomId(null); // Store that somewhere?
+                    ArrayNode arguments = objectMapper.createArrayNode();
+                    arguments.add(proc.procName);
+                    PublishMessage pub = new PublishMessage(-1, null, "wamp.procedure.on_unregister", arguments, proc.options());
+                    publishEvent(channel.realm, null, pub, publicationId, false);
                 }
                 channel.providedProcedures = null;
                 channel.pendingInvocations = null;
@@ -158,16 +164,46 @@ public class WampRouter {
         }
     }
     
+    static interface MetaProcedure{
+        public ResultMessage getResultMessage(Realm realm, long requestId);
+    }
+
     static class Procedure {
         final String procName;
+        private final File optionsFile;
         final ClientHandler provider;
         final long registrationId;
         final List<Invocation> pendingCalls = new ArrayList<WampRouter.Invocation>();
         
-        public Procedure(String name, ClientHandler provider, long registrationId) {
+        public Procedure(String name, ObjectNode options, ClientHandler provider, long registrationId) {
             this.procName = name;
             this.provider = provider;
             this.registrationId = registrationId;
+
+            if(options==null)
+                optionsFile = null;
+            else{
+                File optionsDir = new File(System.getProperty(OPTIONS_DIR, "."), "procedures");
+                optionsDir.mkdirs();
+                try{
+                    optionsFile = File.createTempFile("procedure", ".json", optionsDir);
+                    optionsFile.deleteOnExit();
+                    new ObjectMapper().writeValue(optionsFile, options);
+                }catch(IOException e){
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        public ObjectNode options(){
+            try{
+                if(optionsFile==null)
+                    return JsonNodeFactory.instance.objectNode();
+                else
+                    return (ObjectNode)new ObjectMapper().readTree(optionsFile);
+            }catch(IOException e){
+                throw new RuntimeException(e);
+            }
         }
     }
     
@@ -204,7 +240,8 @@ public class WampRouter {
     
     final Map<String, Realm> realms;
     final Set<IConnectionController> idleChannels;
-    
+    final Map<String, MetaProcedure> metaProcedures = new HashMap<String, MetaProcedure>();
+
     /** The number of connections that have to be closed. This is important for shutdown */
     int connectionsToClose = 0;
     
@@ -226,7 +263,7 @@ public class WampRouter {
     }
 
     WampRouter(Map<String, RealmConfig> realms) {
-        
+
         // Populate the realms from the configuration
         this.realms = new HashMap<String, Realm>();
         for (Map.Entry<String, RealmConfig> e : realms.entrySet()) {
@@ -246,6 +283,17 @@ public class WampRouter {
         this.scheduler = Schedulers.from(eventLoop);
 
         idleChannels = new HashSet<IConnectionController>();
+
+        metaProcedures.put("wamp.procedure.list", new MetaProcedure() {
+            @Override
+            public ResultMessage getResultMessage(Realm realm, long requestId) {
+                ObjectNode kwArguments = objectMapper.createObjectNode();
+                for (Procedure procedure : realm.procedures.values()) {
+                    kwArguments.set(procedure.procName, procedure.options());
+                }
+                return new ResultMessage(requestId, null, null, kwArguments);
+            }
+        });
     }
     
     /**
@@ -316,7 +364,7 @@ public class WampRouter {
                         ri.removeChannel(channel, false);
                         channel.markAsClosed();
                         GoodbyeMessage goodbye = new GoodbyeMessage(null, ApplicationError.SYSTEM_SHUTDOWN);
-                        channel.controller.sendMessage(goodbye, IWampConnectionPromise.Empty);
+                        channel.controller.sendMessage(goodbye, IWampConnectionPromise.LogError);
                         closeConnection(channel.controller, true);
                     }
                     ri.channelsBySessionId.clear();
@@ -334,12 +382,13 @@ public class WampRouter {
         Open,
         Closed
     }
-    
+
+    private List<IWampConnection> flushList = new ArrayList<IWampConnection>();
     IWampConnectionAcceptor connectionAcceptor = new IWampConnectionAcceptor() {
         @Override
         public IWampConnectionListener createNewConnectionListener() {
             ClientHandler newHandler = new ClientHandler();
-            IConnectionController newController = new QueueingConnectionController(eventLoop, newHandler);
+            IConnectionController newController = new ServerConnectionController(eventLoop, newHandler, flushList);
             newHandler.controller = newController;
             return newController;
         }
@@ -352,14 +401,14 @@ public class WampRouter {
                     @Override
                     public void run() {
                         if (connectionListener == null
-                                || !(connectionListener instanceof QueueingConnectionController)
+                                || !(connectionListener instanceof IConnectionController)
                                 || newConnection == null) {
                             // This is always true if the transport provider does not manipulate the structure
                             // that was sent by the router
-                            if (newConnection != null) newConnection.close(false, IWampConnectionPromise.Empty);
+                            if (newConnection != null) newConnection.close(false, IWampConnectionPromise.LogError);
                             return;
                         }
-                        QueueingConnectionController controller = (QueueingConnectionController)connectionListener;
+                        IConnectionController controller = (IConnectionController)connectionListener;
                         controller.setConnection(newConnection);
                         
                         if (isDisposed) {
@@ -379,7 +428,7 @@ public class WampRouter {
                 Runnable r = new Runnable () {
                     @Override
                     public void run() {
-                        newConnection.close(false, IWampConnectionPromise.Empty);
+                        newConnection.close(false, IWampConnectionPromise.LogError);
                     }
                 };
                 ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -434,6 +483,9 @@ public class WampRouter {
         @Override
         public void transportError(Throwable cause) {
             if (isDisposed || state != RouterHandlerState.Open) return;
+            if (cause!=null) {
+                logger.error("closing client because of transportError", cause);
+            }
             if (realm != null) {
                 closeActiveClient(ClientHandler.this, null);
             } else {
@@ -449,6 +501,11 @@ public class WampRouter {
             } else {
                 onMessageFromRegisteredChannel(ClientHandler.this, message);
             }
+        }
+
+        @Override
+        public void readCompleted(){
+
         }
     }
     
@@ -469,7 +526,7 @@ public class WampRouter {
             // Echo the message in case of goodbye
             if (msg instanceof GoodbyeMessage) {
                 GoodbyeMessage reply = new GoodbyeMessage(null, ApplicationError.GOODBYE_AND_OUT);
-                handler.controller.sendMessage(reply, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(reply, IWampConnectionPromise.LogError);
             }
         } else if (msg instanceof CallMessage) {
             // The client wants to call a remote function
@@ -485,7 +542,14 @@ public class WampRouter {
                 // Client sent an invalid request ID
                 err = ApplicationError.INVALID_ARGUMENT;
             }
-            
+
+            MetaProcedure metaProcedure = metaProcedures.get(call.procedure);
+            if (metaProcedure != null) {
+                ResultMessage result = metaProcedure.getResultMessage(handler.realm, call.requestId);
+                handler.controller.sendMessage(result, IWampConnectionPromise.LogError);
+                return;
+            }
+
             Procedure proc = null;
             if (err == null) {
                 proc = handler.realm.procedures.get(call.procedure);
@@ -495,7 +559,7 @@ public class WampRouter {
             if (err != null) { // If we have an error send that to the client
                 ErrorMessage errMsg = new ErrorMessage(CallMessage.ID, call.requestId, 
                     null, err, null, null);
-                handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 return;
             }
             
@@ -516,7 +580,7 @@ public class WampRouter {
             // And send it to the provider
             InvocationMessage imsg = new InvocationMessage(invoc.invocationRequestId,
                 proc.registrationId, null, call.arguments, call.argumentsKw);
-            proc.provider.controller.sendMessage(imsg, IWampConnectionPromise.Empty);
+            proc.provider.controller.sendMessage(imsg, IWampConnectionPromise.LogError);
         } else if (msg instanceof YieldMessage) {
             // The clients sends as the result of an RPC
             // Verify the message
@@ -530,7 +594,7 @@ public class WampRouter {
             invoc.procedure.pendingCalls.remove(invoc);
             // Send the result to the original caller
             ResultMessage result = new ResultMessage(invoc.callRequestId, null, yield.arguments, yield.argumentsKw);
-            invoc.caller.controller.sendMessage(result, IWampConnectionPromise.Empty);
+            invoc.caller.controller.sendMessage(result, IWampConnectionPromise.LogError);
         } else if (msg instanceof ErrorMessage) {
             ErrorMessage err = (ErrorMessage) msg;
             if (!(IdValidator.isValidId(err.requestId))) {
@@ -555,7 +619,7 @@ public class WampRouter {
                 // Send the result to the original caller
                 ErrorMessage fwdError = new ErrorMessage(CallMessage.ID, invoc.callRequestId, 
                     null, err.error, err.arguments, err.argumentsKw);
-                invoc.caller.controller.sendMessage(fwdError, IWampConnectionPromise.Empty);
+                invoc.caller.controller.sendMessage(fwdError, IWampConnectionPromise.LogError);
             }
             // else TODO: Are there any other possibilities where a client could return ERROR
         } else if (msg instanceof RegisterMessage) {
@@ -582,14 +646,14 @@ public class WampRouter {
             if (err != null) { // If we have an error send that to the client
                 ErrorMessage errMsg = new ErrorMessage(RegisterMessage.ID, reg.requestId, 
                     null, err, null, null);
-                handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 return;
             }
             
             // Everything checked, we can register the caller as the procedure provider
             long registrationId = IdGenerator.newLinearId(handler.lastUsedId, handler.providedProcedures);
             handler.lastUsedId = registrationId;
-            Procedure procInfo = new Procedure(reg.procedure, handler, registrationId);
+            Procedure procInfo = new Procedure(reg.procedure, reg.options, handler, registrationId);
             
             // Insert new procedure
             handler.realm.procedures.put(reg.procedure, procInfo);
@@ -600,7 +664,13 @@ public class WampRouter {
             handler.providedProcedures.put(procInfo.registrationId, procInfo);
             
             RegisteredMessage response = new RegisteredMessage(reg.requestId, procInfo.registrationId);
-            handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+            handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
+
+            long publicationId = 0; // IdGenerator.newRandomId(null); // Store that somewhere?
+            ArrayNode arguments = objectMapper.createArrayNode();
+            arguments.add(procInfo.procName);
+            PublishMessage pub = new PublishMessage(reg.requestId, null, "wamp.procedure.on_register", arguments, procInfo.options());
+            publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof UnregisterMessage) {
             // The client wants to unregister a procedure
             // Verify the message
@@ -628,7 +698,7 @@ public class WampRouter {
             if (err != null) { // If we have an error send that to the client
                 ErrorMessage errMsg = new ErrorMessage(UnregisterMessage.ID, unreg.requestId, 
                     null, err, null, null);
-                handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 return;
             }
             
@@ -638,7 +708,7 @@ public class WampRouter {
                 if (invoc.caller.state == RouterHandlerState.Open) {
                     ErrorMessage errMsg = new ErrorMessage(CallMessage.ID, invoc.callRequestId, 
                         null, ApplicationError.NO_SUCH_PROCEDURE, null, null);
-                    invoc.caller.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                    invoc.caller.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 }
             }
             proc.pendingCalls.clear();
@@ -654,7 +724,13 @@ public class WampRouter {
             
             // Send the acknowledge
             UnregisteredMessage response = new UnregisteredMessage(unreg.requestId);
-            handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+            handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
+
+            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
+            ArrayNode arguments = objectMapper.createArrayNode();
+            arguments.add(proc.procName);
+            PublishMessage pub = new PublishMessage(unreg.requestId, null, "wamp.procedure.on_unregister", arguments, proc.options());
+            publishEvent(handler.realm, null, pub, publicationId, false);
         } else if (msg instanceof SubscribeMessage) {
             // The client wants to subscribe to a procedure
             // Verify the message
@@ -700,7 +776,7 @@ public class WampRouter {
             if (err != null) { // If we have an error send that to the client
                 ErrorMessage errMsg = new ErrorMessage(SubscribeMessage.ID, sub.requestId, 
                     null, err, null, null);
-                handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 return;
             }
             
@@ -737,7 +813,7 @@ public class WampRouter {
             }
             
             SubscribedMessage response = new SubscribedMessage(sub.requestId, subscription.subscriptionId);
-            handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+            handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
         } else if (msg instanceof UnsubscribeMessage) {
             // The client wants to cancel a subscription
             // Verify the message
@@ -763,7 +839,7 @@ public class WampRouter {
             if (err != null) { // If we have an error send that to the client
                 ErrorMessage errMsg = new ErrorMessage(UnsubscribeMessage.ID, unsub.requestId, 
                     null, err, null, null);
-                handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 return;
             }
 
@@ -784,17 +860,22 @@ public class WampRouter {
             
             // Send the acknowledge
             UnsubscribedMessage response = new UnsubscribedMessage(unsub.requestId);
-            handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+            handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
         } else if (msg instanceof PublishMessage) {
             // The client wants to publish something to all subscribers (apart from himself)
             PublishMessage pub = (PublishMessage) msg;
             // Check whether the client wants an acknowledgement for the publication
             // Default is no
             boolean sendAcknowledge = false;
+            boolean skipPublisher = true;
+
             JsonNode ackOption = pub.options.get("acknowledge");
-            if (ackOption != null && ackOption.asBoolean() == true)
-                sendAcknowledge = true;
-            
+            if (ackOption != null)
+                sendAcknowledge = ackOption.asBoolean(false);
+            JsonNode excludeMeNode = pub.options.get("exclude_me");
+            if (excludeMeNode != null)
+                skipPublisher = excludeMeNode.asBoolean(true);
+
             String err = null;
             if (!UriValidator.tryValidate(pub.topic, handler.realm.config.useStrictUriValidation)) {
                 // Client sent an invalid URI
@@ -810,54 +891,57 @@ public class WampRouter {
                 ErrorMessage errMsg = new ErrorMessage(PublishMessage.ID, pub.requestId, 
                     null, err, null, null);
                 if (sendAcknowledge) {
-                    handler.controller.sendMessage(errMsg, IWampConnectionPromise.Empty);
+                    handler.controller.sendMessage(errMsg, IWampConnectionPromise.LogError);
                 }
                 return;
             }
             
-            long publicationId = IdGenerator.newRandomId(null); // Store that somewhere?
-
-            // Get the subscriptions for this topic on the realm
-            Subscription exactSubscription = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Exact).get(pub.topic);
-            if (exactSubscription != null) {
-                publishEvent(handler, pub, publicationId, exactSubscription);
-            }
-
-            Map<String, Subscription> prefixSubscriptionMap = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Prefix);
-            for (Subscription prefixSubscription : prefixSubscriptionMap.values()) {
-                if (pub.topic.startsWith(prefixSubscription.topic)) {
-                    publishEvent(handler, pub, publicationId, prefixSubscription);
-                }
-            }
-
-            Map<String, Subscription> wildcardSubscriptionMap = handler.realm.subscriptionsByFlags.get(SubscriptionFlags.Wildcard);
-            String[] components = pub.topic.split("\\.", -1);
-            for (Subscription wildcardSubscription : wildcardSubscriptionMap.values()) {
-                boolean matched = true;
-                if (components.length == wildcardSubscription.components.length) {
-                    for (int i=0; i < components.length; i++) {
-                        if (wildcardSubscription.components[i].length() > 0
-                                && !components[i].equals(wildcardSubscription.components[i])) {
-                            matched = false;
-                            break;
-                        }
-                    }
-                }else
-                    matched = false;
-
-                if (matched) {
-                    publishEvent(handler, pub, publicationId, wildcardSubscription);
-                }
-            }
+            long publicationId = 0;//IdGenerator.newRandomId(null); // Store that somewhere?
+            publishEvent(handler.realm, handler, pub, publicationId, skipPublisher);
 
             if (sendAcknowledge) {
                 PublishedMessage response = new PublishedMessage(pub.requestId, publicationId);
-                handler.controller.sendMessage(response, IWampConnectionPromise.Empty);
+                handler.controller.sendMessage(response, IWampConnectionPromise.LogError);
             }
         }
     }
 
-    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription){
+    private void publishEvent(Realm realm, ClientHandler publisher, PublishMessage pub, long publicationId, boolean skipPublisher) {
+        // Get the subscriptions for this topic on the realm
+        Subscription exactSubscription = realm.subscriptionsByFlags.get(SubscriptionFlags.Exact).get(pub.topic);
+        if (exactSubscription != null) {
+            publishEvent(publisher, pub, publicationId, exactSubscription, skipPublisher);
+        }
+
+        Map<String, Subscription> prefixSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Prefix);
+        for (Subscription prefixSubscription : prefixSubscriptionMap.values()) {
+            if (pub.topic.startsWith(prefixSubscription.topic)) {
+                publishEvent(publisher, pub, publicationId, prefixSubscription, skipPublisher);
+            }
+        }
+
+        Map<String, Subscription> wildcardSubscriptionMap = realm.subscriptionsByFlags.get(SubscriptionFlags.Wildcard);
+        for (Subscription wildcardSubscription : wildcardSubscriptionMap.values()) {
+            boolean matched = true;
+            String[] components = pub.getComponents();
+            if (components.length == wildcardSubscription.components.length) {
+                for (int i=0; i < components.length; i++) {
+                    if (wildcardSubscription.components[i].length() > 0
+                            && !components[i].equals(wildcardSubscription.components[i])) {
+                        matched = false;
+                        break;
+                    }
+                }
+            }else
+                matched = false;
+
+            if (matched) {
+                publishEvent(publisher, pub, publicationId, wildcardSubscription, skipPublisher);
+            }
+        }
+    }
+
+    private void publishEvent(ClientHandler publisher, PublishMessage pub, long publicationId, Subscription subscription, boolean skipPublisher) {
         ObjectNode details = null;
         if (subscription.flags != SubscriptionFlags.Exact) {
             details = objectMapper.createObjectNode();
@@ -868,19 +952,12 @@ public class WampRouter {
                 details, pub.arguments, pub.argumentsKw);
 
         for (ClientHandler receiver : subscription.subscribers) {
-            if (receiver == publisher ) { // Potentially skip the publisher
-                boolean skipPublisher = true;
-                if (pub.options != null) {
-                    JsonNode excludeMeNode = pub.options.get("exclude_me");
-                    if (excludeMeNode != null) {
-                        skipPublisher = excludeMeNode.asBoolean(true);
-                    }
-                }
-                if (skipPublisher) continue;
+            if (receiver == publisher && skipPublisher) { // Potentially skip the publisher
+                continue;
             }
 
             // Publish the event to the subscriber
-            receiver.controller.sendMessage(ev, IWampConnectionPromise.Empty);
+            receiver.controller.sendMessage(ev, IWampConnectionPromise.LogError);
         }
     }
     
@@ -908,7 +985,7 @@ public class WampRouter {
         
         if (errorMsg != null) {
             AbortMessage abort = new AbortMessage(null, errorMsg);
-            channelHandler.controller.sendMessage(abort, IWampConnectionPromise.Empty);
+            channelHandler.controller.sendMessage(abort, IWampConnectionPromise.LogError);
             return;
         }
         
@@ -928,7 +1005,7 @@ public class WampRouter {
         
         if (roles.size() == 0 || hasUnsupportedRoles) {
             AbortMessage abort = new AbortMessage(null, ApplicationError.NO_SUCH_ROLE);
-            channelHandler.controller.sendMessage(abort, IWampConnectionPromise.Empty);
+            channelHandler.controller.sendMessage(abort, IWampConnectionPromise.LogError);
             return;
         }
         
@@ -941,7 +1018,7 @@ public class WampRouter {
 
         // Respond with the WELCOME message
         WelcomeMessage welcome = new WelcomeMessage(channelHandler.sessionId, realm.welcomeDetails);
-        channelHandler.controller.sendMessage(welcome, IWampConnectionPromise.Empty);
+        channelHandler.controller.sendMessage(welcome, IWampConnectionPromise.LogError);
     }
     
     private void closeActiveClient(ClientHandler channel, WampMessage closeMessage) {
@@ -952,7 +1029,7 @@ public class WampRouter {
         
         if (channel.controller != null) {
             if (closeMessage != null)
-                channel.controller.sendMessage(closeMessage, IWampConnectionPromise.Empty);
+                channel.controller.sendMessage(closeMessage, IWampConnectionPromise.LogError);
             closeConnection(channel.controller, true);
         }
     }

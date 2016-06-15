@@ -25,27 +25,14 @@ import java.util.concurrent.ThreadFactory;
 
 import javax.net.ssl.SSLException;
 
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.*;
 import ws.wamp.jawampa.ApplicationError;
 import ws.wamp.jawampa.WampMessages.WampMessage;
-import ws.wamp.jawampa.connection.IPendingWampConnection;
-import ws.wamp.jawampa.connection.IPendingWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampClientConnectionConfig;
-import ws.wamp.jawampa.connection.IWampConnection;
-import ws.wamp.jawampa.connection.IWampConnectionListener;
-import ws.wamp.jawampa.connection.IWampConnectionPromise;
-import ws.wamp.jawampa.connection.IWampConnector;
-import ws.wamp.jawampa.connection.IWampConnectorProvider;
+import ws.wamp.jawampa.connection.*;
 import ws.wamp.jawampa.WampSerialization;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -68,16 +55,8 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 public class NettyWampClientConnectorProvider implements IWampConnectorProvider {
 
     @Override
-    public ScheduledExecutorService createScheduler() {
-        NioEventLoopGroup scheduler = new NioEventLoopGroup(1, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "WampClientEventLoop");
-                t.setDaemon(true);
-                return t;
-            }
-        });
-        return scheduler;
+    public IScheduler createScheduler() {
+        return new NettyScheduler();
     }
 
     @Override
@@ -88,7 +67,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
 
         String scheme = uri.getScheme();
         scheme = scheme != null ? scheme : "";
-        
+
         // Check if the configuration is a netty configuration.
         // However null is an allowed value
         final NettyWampConnectionConfig nettyConfig;
@@ -99,14 +78,14 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
         } else {
             nettyConfig = null;
         }
-        
+
         if (scheme.equalsIgnoreCase("ws") || scheme.equalsIgnoreCase("wss")) {
-            
+
             // Check the host and port field for validity
             if (uri.getHost() == null || uri.getPort() == 0) {
                 throw new ApplicationError(ApplicationError.INVALID_URI);
             }
-            
+
             // Initialize SSL when required
             final boolean needSsl = uri.getScheme().equalsIgnoreCase("wss");
             final SslContext sslCtx0;
@@ -123,7 +102,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
             } else {
                 sslCtx0 = null;
             }
-            
+
             final String subProtocols = WampSerialization.makeWebsocketSubprotocolList(serializations);
 
             final int maxFramePayloadLength = (nettyConfig == null )? NettyWampConnectionConfig.DEFAULT_MAX_FRAME_PAYLOAD_LENGTH : nettyConfig.getMaxFramePayloadLength();
@@ -131,33 +110,43 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
             // Return a factory that creates a channel for websocket connections
             return new IWampConnector() {
                 @Override
-                public IPendingWampConnection connect(final ScheduledExecutorService scheduler,
+                public IPendingWampConnection connect(final IScheduler scheduler,
                         final IPendingWampConnectionListener connectListener,
                         final IWampConnectionListener connectionListener) {
-                    
+                    final NettyScheduler nettyScheduler = (NettyScheduler) scheduler;
                     // Use well-known ports if not explicitly specified
                     final int port;
                     if (uri.getPort() == -1) {
                         if (needSsl) port = 443;
                         else port = 80;
                     } else port = uri.getPort();
-                    
+
                     final WebSocketClientHandshaker handshaker = WebSocketClientHandshakerFactory.newHandshaker(
                         uri, WebSocketVersion.V13, subProtocols,
                         false, new DefaultHttpHeaders(), maxFramePayloadLength);
-                    
+
                     /**
                      * Netty handler for that receives and processes WampMessages and state
                      * events from the pipeline.
                      * A new instance of this is created for each connection attempt.
                      */
-                    final ChannelHandler connectionHandler = new SimpleChannelInboundHandler<WampMessage>() {
+                    final ChannelInboundHandler connectionHandler = new SimpleChannelInboundHandler<WampMessage>() {
                         boolean connectionWasEstablished = false;
                         /** Guard to prevent forwarding events aftert the channel was closed */
                         boolean wasClosed = false;
-                        
+                        ChannelHandlerContext ctx;
+                        ChannelPromise voidPromise;
+
+                        @Override
+                        public void channelActive(ChannelHandlerContext ctx) throws Exception{
+                            this.ctx = ctx;
+                            voidPromise = ctx.channel().voidPromise();
+                            super.channelActive(ctx);
+                        }
+
                         @Override
                         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                            this.ctx = null;
                             if (wasClosed) return;
                             wasClosed = true;
                             if (connectionWasEstablished) {
@@ -167,7 +156,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                                 connectListener.connectFailed(new ApplicationError(ApplicationError.TRANSPORT_CLOSED));
                             }
                         }
-                        
+
                         @Override
                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
                             if (wasClosed) return;
@@ -180,39 +169,38 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                             }
                             super.exceptionCaught(ctx, cause);
                         }
-                        
+
                         @Override
                         public void userEventTriggered(final ChannelHandlerContext ctx, Object evt) throws Exception {
                             if (wasClosed) return;
                             if (evt instanceof ConnectionEstablishedEvent) {
                                 ConnectionEstablishedEvent ev = (ConnectionEstablishedEvent)evt;
                                 final WampSerialization serialization = ev.serialization();
-                                
+
                                 IWampConnection connection = new IWampConnection() {
                                     @Override
                                     public WampSerialization serialization() {
                                         return serialization;
                                     }
-                                    
+
                                     @Override
                                     public boolean isSingleWriteOnly() {
                                         return false;
                                     }
-                                    
+
                                     @Override
                                     public void sendMessage(WampMessage message, final IWampConnectionPromise<Void> promise) {
-                                        ChannelFuture f = ctx.writeAndFlush(message);
-                                        f.addListener(new ChannelFutureListener() {
-                                            @Override
-                                            public void operationComplete(ChannelFuture future) throws Exception {
-                                                if (future.isSuccess() || future.isCancelled())
-                                                    promise.fulfill(null);
-                                                else
-                                                    promise.reject(future.cause());
-                                            }
-                                        });
+                                        if(nettyScheduler.writing)
+                                            ctx.write(message, voidPromise);
+                                        else
+                                            ctx.writeAndFlush(message, voidPromise);
                                     }
-                                    
+
+                                    @Override
+                                    public void flush(){
+                                        ctx.flush();
+                                    }
+
                                     @Override
                                     public void close(boolean sendRemaining, final IWampConnectionPromise<Void> promise) {
                                         // sendRemaining is ignored. Remaining data is always sent
@@ -235,9 +223,9 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                                         });
                                     }
                                 };
-                                
+
                                 connectionWasEstablished = true;
-                                
+
                                 // Connection to the remote host was established
                                 // However the WAMP session is not established until the handshake was finished
                                 connectListener.connectSucceeded(connection);
@@ -250,42 +238,81 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                             assert (connectionWasEstablished);
                             connectionListener.messageReceived(msg);
                         }
+
+                        @Override
+                        public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception{
+                            if(nettyScheduler.writing)
+                                return;
+                            nettyScheduler.writing = true;
+                            try{
+                                ctx = this.ctx;
+                                while(true){
+                                    Runnable runnable = nettyScheduler.queue.poll();
+                                    if(runnable==null){
+                                        ctx.flush();
+                                        break;
+                                    }
+                                    runnable.run();
+                                    if(!ctx.channel().isWritable()){
+                                        ctx.flush();
+                                        if(!ctx.channel().isWritable())
+                                            break;
+                                    }
+                                }
+                            }finally{
+                                nettyScheduler.writeInProgress.set(!ctx.channel().isWritable());
+                                nettyScheduler.writing = false;
+                            }
+                        }
                     };
-                    
+
+                    nettyScheduler.writeTask = new Runnable(){
+                        @Override
+                        public void run(){
+                            try{
+                                connectionHandler.channelWritabilityChanged(null);
+                            }catch(Exception e){
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+
                     // If the assigned scheduler is a netty eventloop use this
                     final EventLoopGroup nettyEventLoop;
-                    if (scheduler instanceof EventLoopGroup) {
-                        nettyEventLoop = (EventLoopGroup)scheduler;
+
+                    if (scheduler.getExecutor() instanceof EventLoopGroup) {
+                        nettyEventLoop = (EventLoopGroup)scheduler.getExecutor();
                     } else {
                         connectListener.connectFailed(new ApplicationError(ApplicationError.INCOMATIBLE_SCHEDULER));
                         return IPendingWampConnection.Dummy;
                     }
-                    
+
                     Bootstrap b = new Bootstrap();
                     b.group(nettyEventLoop)
                      .channel(NioSocketChannel.class)
-                     .handler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel ch) {
-                        ChannelPipeline p = ch.pipeline();
-                        if (proxyAddress != null) {
-                            p.addLast(new HttpProxyHandler(proxyAddress));
-                        }
-                        if (sslCtx0 != null) {
-                            p.addLast(sslCtx0.newHandler(ch.alloc(),
-                                                         uri.getHost(),
-                                                         port));
-                        }
-                        p.addLast(
-                            new HttpClientCodec(),
-                            new HttpObjectAggregator(8192),
-                            new WebSocketClientProtocolHandler(handshaker, false),
-                            new WebSocketFrameAggregator(WampHandlerConfiguration.MAX_WEBSOCKET_FRAME_SIZE),
-                            new WampClientWebsocketHandler(handshaker),
-                            connectionHandler);
-                        }
-                    });
-                    
+                     .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+                     .handler(new ChannelInitializer<SocketChannel>(){
+                         @Override
+                         protected void initChannel(SocketChannel ch){
+                             ChannelPipeline p = ch.pipeline();
+                             if (proxyAddress != null) {
+                                 p.addLast(new HttpProxyHandler(proxyAddress));
+                             }
+                             if(sslCtx0 != null){
+                                 p.addLast(sslCtx0.newHandler(ch.alloc(),
+                                         uri.getHost(),
+                                         port));
+                             }
+                             p.addLast(
+                                     new HttpClientCodec(),
+                                     new HttpObjectAggregator(8192),
+                                     new WebSocketClientProtocolHandler(handshaker, false),
+                                     new WebSocketFrameAggregator(WampHandlerConfiguration.MAX_WEBSOCKET_FRAME_SIZE),
+                                     new WampClientWebsocketHandler(handshaker),
+                                     connectionHandler);
+                         }
+                     });
+
                     final ChannelFuture connectFuture = b.connect(uri.getHost(), port);
                     connectFuture.addListener(new ChannelFutureListener() {
                         @Override
@@ -301,7 +328,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                             }
                         }
                     });
-                    
+
                     // Return the connection in progress with the ability for cancellation
                     return new IPendingWampConnection() {
                         @Override
@@ -312,7 +339,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                 }
             };
         }
-        
+
         throw new ApplicationError(ApplicationError.INVALID_URI);
     }
 }

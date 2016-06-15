@@ -246,7 +246,7 @@ public class WampClient {
             return resultSubject;
         }
          
-        stateController.scheduler().execute(new Runnable() {
+        stateController.scheduler().submit(new Runnable() {
             @Override
             public void run() {
                 if (!(stateController.currentState() instanceof SessionEstablishedState)) {
@@ -261,7 +261,26 @@ public class WampClient {
         });
         return resultSubject;
     }
-    
+
+    public void publishMessage(final String topic, final ArrayNode arguments, final ObjectNode argumentsKw)
+    {
+        final AsyncSubject<Long> resultSubject = AsyncSubject.create();
+
+        stateController.scheduler().submit(new Runnable() {
+            @Override
+            public void run() {
+                if (!(stateController.currentState() instanceof SessionEstablishedState)) {
+                    resultSubject.onError(new ApplicationError(ApplicationError.NOT_CONNECTED));
+                    return;
+                }
+                // Forward publish into the session
+                SessionEstablishedState curState = (SessionEstablishedState)stateController.currentState();
+                curState.performPublishMessage(topic, arguments, argumentsKw);
+
+            }
+        });
+    }
+
     /**
      * Registers a procedure at the router which will afterwards be available
      * for remote procedure calls from other clients.<br>
@@ -276,10 +295,11 @@ public class WampClient {
      * In case of errors during subscription onError will be called.
      * @param topic The name of the procedure which this client wants to
      * provide.<br>
+     * @param options additional options if any. <br>
      * Must be valid WAMP URI.
      * @return An observable that can be used to provide a procedure.
      */
-    public Observable<Request> registerProcedure(final String topic) {
+    public Observable<Request> registerProcedure(final String topic, final ObjectNode options) {
         return Observable.create(new OnSubscribe<Request>() {
             @Override
             public void call(final Subscriber<? super Request> subscriber) {
@@ -303,13 +323,17 @@ public class WampClient {
                         }
                         // Forward publish into the session
                         SessionEstablishedState curState = (SessionEstablishedState)stateController.currentState();
-                        curState.performRegisterProcedure(topic, subscriber);
+                        curState.performRegisterProcedure(topic, options, subscriber);
                     }
                 });
             }
         });
     }
-    
+
+    public Observable<Request> registerProcedure(final String topic) {
+        return registerProcedure(topic, null);
+    }
+
     /**
      * Returns an observable that allows to subscribe on the given topic.<br>
      * The actual subscription will only be made after subscribe() was called
@@ -746,4 +770,11 @@ public class WampClient {
         return p.getFuture();
     }
 
+    public boolean isEventThread(){
+        return stateController.scheduler().isEventThread();
+    }
+    
+    public void submit(Runnable r){
+        stateController.scheduler().execute(r);
+    }
 }
