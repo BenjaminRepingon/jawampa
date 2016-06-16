@@ -16,35 +16,31 @@
 
 package ws.wamp.jawampa.transport.netty;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty.util.CharsetUtil;
+import ws.wamp.jawampa.ApplicationError;
+import ws.wamp.jawampa.WampRouter;
+import ws.wamp.jawampa.WampSerialization;
+
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.*;
-import ws.wamp.jawampa.ApplicationError;
-import ws.wamp.jawampa.WampRouter;
-import ws.wamp.jawampa.WampSerialization;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
-import io.netty.util.CharsetUtil;
-import static io.netty.handler.codec.http.HttpHeaders.Names.*;
-import static io.netty.handler.codec.http.HttpMethod.*;
+import static io.netty.handler.codec.http.HttpMethod.GET;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
-import static io.netty.handler.codec.http.HttpVersion.*;
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 /**
  * A simple default implementation for the websocket adapter for a WAMP router.<br>
@@ -113,7 +109,7 @@ public class SimpleWampWebsocketListener {
             if (uri.getScheme().equalsIgnoreCase("wss") && sslCtx == null) {
                 // Use a self signed certificate when we got none provided through the constructor
                 SelfSignedCertificate ssc = new SelfSignedCertificate();
-                sslCtx = SslContext.newServerContext(ssc.certificate(), ssc.privateKey());
+                sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
             }
             
             // Use well-known ports if not explicitly specified
@@ -194,17 +190,17 @@ public class SimpleWampWebsocketListener {
         
         private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) {
             // Handle a bad request.
-            if (!req.getDecoderResult().isSuccess()) {
+            if (!req.decoderResult().isSuccess()) {
                 sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, BAD_REQUEST));
                 return;
             }
             // Allow only GET methods.
-            if (req.getMethod() != GET) {
+            if (req.method() != GET) {
                 sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, FORBIDDEN));
                 return;
             }
             // Send the demo page and favicon.ico
-            if ("/".equals(req.getUri())) {
+            if ("/".equals(req.uri())) {
                 ByteBuf content = Unpooled.copiedBuffer(
                     "<html><head><title>Wamp Router</title></head><body>" +
                     "<h1>This server provides a wamp router on path " + 
@@ -212,12 +208,12 @@ public class SimpleWampWebsocketListener {
                     "</body></html>"
                     , CharsetUtil.UTF_8);
                 FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, OK, content);
-                res.headers().set(CONTENT_TYPE, "text/html; charset=UTF-8");
-                HttpHeaders.setContentLength(res, content.readableBytes());
+                res.headers().set( HttpHeaderNames.CONTENT_TYPE, "text/html; charset=UTF-8" );
+                HttpUtil.setContentLength( res, content.readableBytes() );
                 sendHttpResponse(ctx, req, res);
                 return;
             }
-            if ("/favicon.ico".equals(req.getUri())) {
+            if ("/favicon.ico".equals(req.uri())) {
                 FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, NOT_FOUND);
                 sendHttpResponse(ctx, req, res);
                 return;
@@ -230,15 +226,15 @@ public class SimpleWampWebsocketListener {
         private static void sendHttpResponse(
             ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse res) {
             // Generate an error page if response getStatus code is not OK (200).
-            if (res.getStatus().code() != 200) {
-                ByteBuf buf = Unpooled.copiedBuffer(res.getStatus().toString(), CharsetUtil.UTF_8);
+            if (res.status().code() != 200) {
+                ByteBuf buf = Unpooled.copiedBuffer(res.status().toString(), CharsetUtil.UTF_8);
                 res.content().writeBytes(buf);
                 buf.release();
-                HttpHeaders.setContentLength(res, res.content().readableBytes());
+                HttpUtil.setContentLength( res, res.content().readableBytes() );
             }
             // Send the response and close the connection if necessary.
             ChannelFuture f = ctx.channel().writeAndFlush(res);
-            if (!HttpHeaders.isKeepAlive(req) || res.getStatus().code() != 200) {
+            if (!HttpUtil.isKeepAlive(req) || res.status().code() != 200) {
                 f.addListener(ChannelFutureListener.CLOSE);
             }
         }

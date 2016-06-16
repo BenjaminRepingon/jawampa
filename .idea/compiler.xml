@@ -19,14 +19,14 @@
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="jawampa-core_main" target="1.6" />
-      <module name="jawampa-core_test" target="1.6" />
-      <module name="jawampa-netty_main" target="1.6" />
-      <module name="jawampa-netty_test" target="1.6" />
-      <module name="jawampa_main" target="1.5" />
-      <module name="jawampa_test" target="1.5" />
-      <module name="jawamps-examples_main" target="1.7" />
-      <module name="jawamps-examples_test" target="1.7" />
+      <module name="jawampa-core_main" target="1.8" />
+      <module name="jawampa-core_test" target="1.8" />
+      <module name="jawampa-examples_main" target="1.8" />
+      <module name="jawampa-examples_test" target="1.8" />
+      <module name="jawampa-netty_main" target="1.8" />
+      <module name="jawampa-netty_test" target="1.8" />
+      <module name="jawampa_main" target="1.8" />
+      <module name="jawampa_test" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>

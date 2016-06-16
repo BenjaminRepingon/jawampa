@@ -2,16 +2,18 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/236857267/jawampa.iml" filepath="$PROJECT_DIR$/.idea/modules/236857267/jawampa.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core.iml" group="jawampa-core" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core_main.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core_main.iml" group="jawampa-core" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core_test.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core_test.iml" group="jawampa-core" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty.iml" filepath="$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty.iml" group="jawampa-netty" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty_main.iml" filepath="$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty_main.iml" group="jawampa-netty" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty_test.iml" filepath="$PROJECT_DIR$/.idea/modules/529512182/jawampa-netty_test.iml" group="jawampa-netty" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples.iml" filepath="$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples.iml" group="jawamps-examples" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples_main.iml" filepath="$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples_main.iml" group="jawamps-examples" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples_test.iml" filepath="$PROJECT_DIR$/.idea/modules/666957283/jawamps-examples_test.iml" group="jawamps-examples" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core.iml" group="jawampa-core" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core_main.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core_main.iml" group="jawampa-core" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core_test.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-core/jawampa-core_test.iml" group="jawampa-core" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples.iml" group="jawampa-examples" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples_main.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples_main.iml" group="jawampa-examples" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples_test.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-examples/jawampa-examples_test.iml" group="jawampa-examples" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty.iml" group="jawampa-netty" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty_main.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty_main.iml" group="jawampa-netty" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty_test.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa-netty/jawampa-netty_test.iml" group="jawampa-netty" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa_main.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa_main.iml" group="jawampa" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/jawampa_test.iml" filepath="$PROJECT_DIR$/.idea/modules/jawampa_test.iml" group="jawampa" />
     </modules>
   </component>
 </project>
