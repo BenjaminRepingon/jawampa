@@ -33,18 +33,18 @@ public class SingleThreadedComputationScheduler extends rx.Scheduler {
      * A single threaded worker from the computation threadpool on which
      * we we will base our workers
      */
-	final rx.Scheduler.Worker innerWorker = Schedulers.computation().createWorker();
+	final Worker innerWorker = Schedulers.computation().createWorker();
     
     @Override
     public Worker createWorker() {
         return new SchedulerWorker(innerWorker);
     }
     
-    private static class SchedulerWorker extends rx.Scheduler.Worker {
+    private static class SchedulerWorker extends Worker {
         final CompositeSubscription innerSubscription = new CompositeSubscription();
-        final rx.Scheduler.Worker innerWorker;
+        final Worker innerWorker;
 
-        public SchedulerWorker(rx.Scheduler.Worker innerWorker) {
+        public SchedulerWorker(Worker innerWorker) {
             this.innerWorker = innerWorker;
         }
 

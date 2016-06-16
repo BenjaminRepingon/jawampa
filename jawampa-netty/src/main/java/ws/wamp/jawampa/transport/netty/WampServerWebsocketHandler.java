@@ -17,13 +17,9 @@
 package ws.wamp.jawampa.transport.netty;
 
 import io.netty.channel.*;
+import io.netty.handler.codec.http.*;
 import ws.wamp.jawampa.WampRouter;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
@@ -49,7 +45,7 @@ import static io.netty.handler.codec.http.HttpVersion.*;
 /**
  * A websocket server adapter for WAMP that integrates into a Netty pipeline.
  */
-public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
+public class WampServerWebsocketHandler extends ChannelHandlerAdapter {
     
     final String websocketPath;
     final WampRouter router;
@@ -71,32 +67,32 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
         this.supportedSerializations = supportedSerializations;
     }
     
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        FullHttpRequest request = (msg instanceof FullHttpRequest) ? (FullHttpRequest) msg : null;
-        
-        // Check for invalid http messages during handshake
-        if (request != null && handshakeInProgress) {
-            request.release();
-            sendBadRequestAndClose(ctx, null);
-            return;
-        }
-        
-        // Transform this when we have an upgrade for our path,
-        // otherwise pass the message
-        if (request != null && isUpgradeRequest(request)) {
-            try {
-                tryWebsocketHandshake(ctx, (FullHttpRequest) msg);
-            } finally {
-                request.release();
-            }
-        } else {
-            ctx.fireChannelRead(msg);
-        }
-    }
+//    @Override
+//    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+//        FullHttpRequest request = (msg instanceof FullHttpRequest) ? (FullHttpRequest) msg : null;
+//
+//        // Check for invalid http messages during handshake
+//        if (request != null && handshakeInProgress) {
+//            request.release();
+//            sendBadRequestAndClose(ctx, null);
+//            return;
+//        }
+//
+//        // Transform this when we have an upgrade for our path,
+//        // otherwise pass the message
+//        if (request != null && isUpgradeRequest(request)) {
+//            try {
+//                tryWebsocketHandshake(ctx, (FullHttpRequest) msg);
+//            } finally {
+//                request.release();
+//            }
+//        } else {
+//            ctx.fireChannelRead(msg);
+//        }
+//    }
     
     private boolean isUpgradeRequest(FullHttpRequest request) {
-        if (!request.getDecoderResult().isSuccess()) {
+        if (!request.decoderResult().isSuccess()) {
             return false;
         }
         
@@ -116,11 +112,11 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
             return false;
         }
         
-        if (!request.headers().contains(HttpHeaders.Names.UPGRADE, HttpHeaders.Values.WEBSOCKET, true)){
+        if (!request.headers().contains(HttpHeaders.Names.UPGRADE, HttpHeaderValues.WEBSOCKET, true)){
             return false;
         }
         
-        return request.getUri().equals(websocketPath);
+        return request.uri().equals(websocketPath);
     }
     
     // All methods inside the connection will be called from the WampRouters thread
@@ -279,7 +275,7 @@ public class WampServerWebsocketHandler extends ChannelInboundHandlerAdapter {
             // This might lead to frames getting sent to the router before it is activated
         }
     }
-    
+
     private String getWebSocketLocation(ChannelHandlerContext ctx, FullHttpRequest req) {
         String location = req.headers().get(HOST) + websocketPath;
         if (ctx.pipeline().get(SslHandler.class) != null) {

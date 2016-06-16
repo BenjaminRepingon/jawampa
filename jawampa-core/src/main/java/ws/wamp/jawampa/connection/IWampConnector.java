@@ -20,7 +20,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public interface IWampConnector {
     IPendingWampConnection connect(
-        IScheduler scheduler,
-        IPendingWampConnectionListener connectListener,
-        IWampConnectionListener connectionListener);
+            IScheduler scheduler,
+            IPendingWampConnectionListener connectListener,
+            IWampConnectionListener connectionListener);
 }

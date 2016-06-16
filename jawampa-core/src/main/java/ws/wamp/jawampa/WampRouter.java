@@ -173,7 +173,7 @@ public class WampRouter {
         private final File optionsFile;
         final ClientHandler provider;
         final long registrationId;
-        final List<Invocation> pendingCalls = new ArrayList<WampRouter.Invocation>();
+        final List<Invocation> pendingCalls = new ArrayList<Invocation>();
         
         public Procedure(String name, ObjectNode options, ClientHandler provider, long registrationId) {
             this.procName = name;
@@ -658,8 +658,8 @@ public class WampRouter {
             // Insert new procedure
             handler.realm.procedures.put(reg.procedure, procInfo);
             if (handler.providedProcedures == null) {
-                handler.providedProcedures = new HashMap<Long, WampRouter.Procedure>();
-                handler.pendingInvocations = new HashMap<Long, WampRouter.Invocation>();
+                handler.providedProcedures = new HashMap<Long, Procedure>();
+                handler.pendingInvocations = new HashMap<Long, Invocation>();
             }
             handler.providedProcedures.put(procInfo.registrationId, procInfo);
             
@@ -782,7 +782,7 @@ public class WampRouter {
             
             // Create a new subscription map for the client if it was not subscribed before
             if (handler.subscriptionsById == null) {
-                handler.subscriptionsById = new HashMap<Long, WampRouter.Subscription>();
+                handler.subscriptionsById = new HashMap<Long, Subscription>();
             }
 
             // Search if a subscription from any client on the realm to this topic exists

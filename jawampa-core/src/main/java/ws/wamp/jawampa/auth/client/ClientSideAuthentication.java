@@ -7,5 +7,5 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public interface ClientSideAuthentication {
     String getAuthMethod();
-    AuthenticateMessage handleChallenge( ChallengeMessage message, ObjectMapper objectMapper );
+    AuthenticateMessage handleChallenge(ChallengeMessage message, ObjectMapper objectMapper);
 }

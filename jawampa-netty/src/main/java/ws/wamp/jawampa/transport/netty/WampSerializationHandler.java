@@ -16,6 +16,7 @@
 
 package ws.wamp.jawampa.transport.netty;
 
+import java.io.OutputStream;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -62,7 +63,7 @@ public class WampSerializationHandler extends MessageToMessageEncoder<WampMessag
         ObjectMapper objectMapper = serialization.getObjectMapper();
         try {
             JsonNode node = msg.toObjectArray(messageNode);
-            objectMapper.writeValue(outStream, node);
+            objectMapper.writeValue((OutputStream) outStream, node);
             messageNode.removeAll();
             if (logger.isDebugEnabled()) {
                 logger.debug("Serialized Wamp Message: {}", node.toString());

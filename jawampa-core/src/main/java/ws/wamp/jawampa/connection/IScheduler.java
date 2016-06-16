@@ -11,4 +11,5 @@ public interface IScheduler{
     public void execute(Runnable runnable);
     public void submit(Runnable runnable);
     public void shutdown();
+    public boolean isShutdown();
 }

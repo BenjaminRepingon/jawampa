@@ -48,7 +48,7 @@ public class Promise<V> {
         }
     }
     
-    public java.util.concurrent.Future<V> getFuture() {
+    public Future<V> getFuture() {
         return new Future<V>() {
             @Override
             public boolean cancel(boolean mayInterruptIfRunning) {

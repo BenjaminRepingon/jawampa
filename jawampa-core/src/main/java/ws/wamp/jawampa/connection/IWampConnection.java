@@ -34,8 +34,8 @@ public interface IWampConnection {
     /**
      * Returns whether only a single message can be sent through the connection and
      * the result must be awaited afterwards or whether the connection supports queuing
-     * and {@link IWampConnection#sendMessage(WampMessage, ICompletionCallback)}
-     * and {@link IWampConnection#sendMessageAndClose(WampMessage, ICompletionCallback)}
+     * and {@link IWampConnection#sendMessage(WampMessage, IWampConnectionPromise)}
+     * and {@link IWampConnection#close(boolean, IWampConnectionPromise)}
      * can be called arbitrarily often.
      * @return true if only one message can be sent at once, false otherwise
      */

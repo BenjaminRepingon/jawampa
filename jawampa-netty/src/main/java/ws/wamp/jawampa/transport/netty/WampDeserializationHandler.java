@@ -16,6 +16,7 @@
 
 package ws.wamp.jawampa.transport.netty;
 
+import java.io.InputStream;
 import java.util.List;
 
 import ws.wamp.jawampa.WampMessages.WampMessage;
@@ -93,7 +94,7 @@ public class WampDeserializationHandler extends MessageToMessageDecoder<WebSocke
             // If we receive an invalid frame on of the following functions will throw
             // This will lead Netty to closing the connection
             ArrayNode arr = objectMapper.readValue(
-                    new ByteBufInputStream(textFrame.content()), ArrayNode.class);
+                    (InputStream) new ByteBufInputStream(textFrame.content()), ArrayNode.class);
 
             if (logger.isDebugEnabled()) {
                 logger.debug("Deserialized Wamp Message: {}", arr.toString());
@@ -111,7 +112,7 @@ public class WampDeserializationHandler extends MessageToMessageDecoder<WebSocke
             // If we receive an invalid frame on of the following functions will throw
             // This will lead Netty to closing the connection
             ArrayNode arr = objectMapper.readValue(
-                    new ByteBufInputStream(binaryFrame.content()), ArrayNode.class);
+                    (InputStream) new ByteBufInputStream(binaryFrame.content()), ArrayNode.class);
 
             if (logger.isDebugEnabled()) {
                 logger.debug("Deserialized Wamp Message: {}", arr.toString());

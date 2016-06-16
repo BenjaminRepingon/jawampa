@@ -62,4 +62,9 @@ public class NettyScheduler implements IScheduler{
     public void shutdown(){
         executor.shutdownGracefully();
     }
+
+    @Override
+    public boolean isShutdown() {
+        return executor.isShutdown();
+    }
 }
