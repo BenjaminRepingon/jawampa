@@ -1,0 +1,3 @@
+include 'jawampa-core'
+include 'jawampa-examples'
+include 'jawampa-netty'

@@ -53,18 +53,9 @@ fabric.properties
 # *.iml
 # modules.xml
 
-
-# Maven
-/target/
-
-# Eclipse
-/.settings
-
 # Gradle
 local.properties
 .gradle
-wrapper
-settings.gradle
 build
 
 *.DS_Store
