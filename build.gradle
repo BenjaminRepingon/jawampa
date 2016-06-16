@@ -5,7 +5,7 @@ allprojects {
     apply plugin: 'java'
 
     group 'ws.wamp.jawampa'
-    version '0.5.0'
+    version '0.5.2'
 }
 
 subprojects {
