@@ -16,8 +16,6 @@
 
 package ws.wamp.jawampa.internal;
 
-import java.util.concurrent.TimeUnit;
-
 import rx.Subscription;
 import rx.functions.Action0;
 import rx.internal.schedulers.ScheduledAction;
@@ -25,55 +23,66 @@ import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 import rx.subscriptions.Subscriptions;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * A single threaded scheduler based on the RX computation scheduler.
  */
-public class SingleThreadedComputationScheduler extends rx.Scheduler {
-    /** 
-     * A single threaded worker from the computation threadpool on which
-     * we we will base our workers
-     */
-	final Worker innerWorker = Schedulers.computation().createWorker();
-    
-    @Override
-    public Worker createWorker() {
-        return new SchedulerWorker(innerWorker);
-    }
-    
-    private static class SchedulerWorker extends Worker {
-        final CompositeSubscription innerSubscription = new CompositeSubscription();
-        final Worker innerWorker;
+public class SingleThreadedComputationScheduler extends rx.Scheduler
+{
+	/**
+	 * A single threaded worker from the computation threadpool on which
+	 * we we will base our workers
+	 */
+	private final Worker innerWorker = Schedulers.computation().createWorker();
 
-        public SchedulerWorker(Worker innerWorker) {
-            this.innerWorker = innerWorker;
-        }
+	@Override
+	public Worker createWorker()
+	{
+		return new SchedulerWorker( innerWorker );
+	}
 
-        @Override
-        public void unsubscribe() {
-            innerSubscription.unsubscribe();
-        }
+	private static class SchedulerWorker extends Worker
+	{
+		final CompositeSubscription innerSubscription = new CompositeSubscription();
+		final Worker innerWorker;
 
-        @Override
-        public boolean isUnsubscribed() {
-            return innerSubscription.isUnsubscribed();
-        }
+		SchedulerWorker( Worker innerWorker )
+		{
+			this.innerWorker = innerWorker;
+		}
 
-        @Override
-        public Subscription schedule(Action0 action) {
-            return schedule(action, 0, null);
-        }
+		@Override
+		public void unsubscribe()
+		{
+			innerSubscription.unsubscribe();
+		}
 
-        @Override
-        public Subscription schedule(Action0 action, long delayTime, TimeUnit unit) {
-            if (innerSubscription.isUnsubscribed()) {
-                // don't schedule, we are unsubscribed
-                return Subscriptions.empty();
-            }
-            
-            ScheduledAction s = (ScheduledAction)innerWorker.schedule(action, delayTime, unit);
-            innerSubscription.add(s);
-            s.addParent(innerSubscription);
-            return s;
-        }
-    }
+		@Override
+		public boolean isUnsubscribed()
+		{
+			return innerSubscription.isUnsubscribed();
+		}
+
+		@Override
+		public Subscription schedule( Action0 action )
+		{
+			return schedule( action, 0, null );
+		}
+
+		@Override
+		public Subscription schedule( Action0 action, long delayTime, TimeUnit unit )
+		{
+			if ( innerSubscription.isUnsubscribed() )
+			{
+				// don't schedule, we are unsubscribed
+				return Subscriptions.empty();
+			}
+
+			ScheduledAction s = (ScheduledAction) innerWorker.schedule( action, delayTime, unit );
+			innerSubscription.add( s );
+			s.addParent( innerSubscription );
+			return s;
+		}
+	}
 }

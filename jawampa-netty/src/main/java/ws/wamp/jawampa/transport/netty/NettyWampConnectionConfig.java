@@ -16,7 +16,7 @@ public class NettyWampConnectionConfig implements IWampClientConnectionConfig {
     }
 
     /**
-     * the SslContext which will be used to create Ssl connections to the WAMP
+     * @return The SslContext which will be used to create Ssl connections to the WAMP
      * router. If this is set to null a default (unsecure) SSL client context will be created
      * and used. 
      */

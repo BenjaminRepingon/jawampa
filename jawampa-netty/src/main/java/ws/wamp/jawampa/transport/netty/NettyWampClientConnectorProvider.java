@@ -16,12 +16,9 @@
 
 package ws.wamp.jawampa.transport.netty;
 
-import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 
 import javax.net.ssl.SSLException;
 
@@ -33,7 +30,6 @@ import ws.wamp.jawampa.connection.*;
 import ws.wamp.jawampa.WampSerialization;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -284,7 +280,7 @@ public class NettyWampClientConnectorProvider implements IWampConnectorProvider 
                         nettyEventLoop = (EventLoopGroup)scheduler.getExecutor();
                     } else {
                         connectListener.connectFailed(new ApplicationError(ApplicationError.INCOMATIBLE_SCHEDULER));
-                        return IPendingWampConnection.Dummy;
+                        return IPendingWampConnection.DUMMY;
                     }
 
                     Bootstrap b = new Bootstrap();

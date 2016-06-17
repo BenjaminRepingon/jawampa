@@ -17,47 +17,55 @@
 package ws.wamp.jawampa.internal;
 
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Random;
 
 /**
  * Contains method for generating WAMP IDs
  */
-public class IdGenerator {
-    
-    /**
-     * Generates a new ID through a random generator.<br>
-     * If the new ID is not valid or is already in use as a key in the provided Map
-     * the process will be repeated until a valid iD can be returned.
-     * @param controlMap The map which should be optionally checked. If the parameter
-     * is not null and contains a key with the new ID value then the ID will not be used. 
-     * @return The new ID
-     */
-    public static long newRandomId(Map<Long, ?> controlMap) {
-        for (;;) {
-            long l = ThreadLocalRandom.current().nextLong();
-            if (l < IdValidator.MIN_VALID_ID || l > IdValidator.MAX_VALID_ID) continue;
-            if (controlMap == null || !controlMap.containsKey(l)) return l;
-        }
-    }
-    
-    /**
-     * Generates a new ID by incrementing an old one.<br>
-     * If the new ID is not valid or is already in use as a key in the provided Map
-     * the process will be repeated until a valid iD can be returned.
-     * @param startValue The starting value for the process. The returned ID will be
-     * startValue + 1 unless that value is not valid or already in use.
-     * @param controlMap The map which should be optionally checked. If the parameter
-     * is not null and contains a key with the new ID value then the ID will not be used. 
-     * @return The new ID
-     */
-    public static long newLinearId(long startValue, Map<Long, ?> controlMap) {
-        long val = startValue;
-        for (;;) {
-            val++;
-            if (val > IdValidator.MAX_VALID_ID)
-                val = IdValidator.MIN_VALID_ID;
-            if (controlMap == null || !controlMap.containsKey(val)) return val;
-        }
-    }
+public class IdGenerator
+{
+	private static final Random RANDOM_GENERATOR = new Random();
+
+	/**
+	 * Generates a new ID through a random generator.<br>
+	 * If the new ID is not valid or is already in use as a key in the provided Map
+	 * the process will be repeated until a valid iD can be returned.
+	 *
+	 * @param controlMap The map which should be optionally checked. If the parameter
+	 *                   is not null and contains a key with the new ID value then the ID will not be used.
+	 * @return The new ID
+	 */
+	public static long newRandomId( Map<Long, ?> controlMap )
+	{
+		for ( ; ; )
+		{
+			long l = RANDOM_GENERATOR.nextLong();
+			if ( l < IdValidator.MIN_VALID_ID || l > IdValidator.MAX_VALID_ID ) continue;
+			if ( controlMap == null || !controlMap.containsKey( l ) ) return l;
+		}
+	}
+
+	/**
+	 * Generates a new ID by incrementing an old one.<br>
+	 * If the new ID is not valid or is already in use as a key in the provided Map
+	 * the process will be repeated until a valid iD can be returned.
+	 *
+	 * @param startValue The starting value for the process. The returned ID will be
+	 *                   startValue + 1 unless that value is not valid or already in use.
+	 * @param controlMap The map which should be optionally checked. If the parameter
+	 *                   is not null and contains a key with the new ID value then the ID will not be used.
+	 * @return The new ID
+	 */
+	public static long newLinearId( long startValue, Map<Long, ?> controlMap )
+	{
+		long val = startValue;
+		for ( ; ; )
+		{
+			val++;
+			if ( val > IdValidator.MAX_VALID_ID )
+				val = IdValidator.MIN_VALID_ID;
+			if ( controlMap == null || !controlMap.containsKey( val ) ) return val;
+		}
+	}
 
 }

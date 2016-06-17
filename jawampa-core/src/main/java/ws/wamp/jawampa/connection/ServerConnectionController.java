@@ -23,166 +23,189 @@ import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
-public class ServerConnectionController implements IConnectionController {
+public class ServerConnectionController implements IConnectionController
+{
+	/**
+	 * The scheduler on which all state transitions will run
+	 */
+	private final ScheduledExecutorService scheduler;
 
-    /** Possible states while closing the connection */
-    enum CloseStatus {
-        /** Close was not issued */
-        None,
-        /** Connection should be closed at the next possible point of time */
-        CloseNow,
-        /** Connection should be closed after all already queued messages have been sent */
-        CloseAfterRemaining,
-        /** Close was issued but not yet acknowledged */
-        CloseSent,
-        /** Close is acknowledged */
-        Closed
-    }
+	/**
+	 * The wrapped connection object. Must be injected later due to Router design
+	 */
+	IWampConnection connection;
 
-    /** The scheduler on which all state transitions will run */
-    final ScheduledExecutorService scheduler;
-    /** The wrapped connection object. Must be injected later due to Router design */
-    IWampConnection connection;
-    /** The wrapped listener object */
-    final IWampConnectionListener connectionListener;
+	/**
+	 * The wrapped listener object
+	 */
+	private final IWampConnectionListener connectionListener;
 
-    /** Whether to forward incoming messages or not */
-    boolean forwardIncoming = true;
-    CloseStatus closeStatus = CloseStatus.None;
+	/**
+	 * Whether to forward incoming messages or not
+	 */
+	private boolean     forwardIncoming = true;
+	private CloseStatus closeStatus     = CloseStatus.None;
 
-    private List<IWampConnection> flushList;
+	private List<IWampConnection> flushList;
 
-    public ServerConnectionController(ScheduledExecutorService scheduler,
-                                      IWampConnectionListener connectionListener, List<IWampConnection> flushList) {
-        this.scheduler = scheduler;
-        this.connectionListener = connectionListener;
-        this.flushList = flushList;
-    }
-    
-    @Override
-    public IWampConnectionListener connectionListener() {
-        return connectionListener;
-    }
-    
-    @Override
-    public IWampConnection connection() {
-        return connection;
-    }
-    
-    @Override
-    public void setConnection(IWampConnection connection) {
-        this.connection = connection;
-    }
-    
-    /**
-     * Tries to schedule a runnable on the underlying executor.<br>
-     * Rejected executions will be suppressed.<br>
-     * This is useful for cases when the clients EventLoop is shut down before
-     * the EventLoop of the underlying connection.
-     * 
-     * @param action The action to schedule.
-     */
-    private void tryScheduleAction(Runnable action) {
-        try {
-            scheduler.submit(action);
-        } catch (RejectedExecutionException e) {}
-    }
-    
-    // IWampConnection members 
-    
-    @Override
-    public WampSerialization serialization() {
-        return connection.serialization();
-    }
+	public ServerConnectionController( ScheduledExecutorService scheduler,
+									   IWampConnectionListener connectionListener, List<IWampConnection> flushList )
+	{
+		this.scheduler = scheduler;
+		this.connectionListener = connectionListener;
+		this.flushList = flushList;
+	}
 
-    @Override
-    public boolean isSingleWriteOnly() {
-        return false;
-    }
+	@Override
+	public IWampConnectionListener connectionListener()
+	{
+		return connectionListener;
+	}
 
-    @Override
-    public void sendMessage(WampMessage message, IWampConnectionPromise<Void> promise) {
-        if (closeStatus != CloseStatus.None)
-            throw new IllegalStateException("close() was already called");
+	@Override
+	public IWampConnection connection()
+	{
+		return connection;
+	}
 
-        connection.sendMessage(message, promise);
-        if(!flushList.contains(connection))
-            flushList.add(connection);
-    }
+	@Override
+	public void setConnection( IWampConnection connection )
+	{
+		this.connection = connection;
+	}
 
-    @Override
-    public void close(boolean sendRemaining, IWampConnectionPromise<Void> promise) {
-        if (closeStatus != CloseStatus.None)
-            throw new IllegalStateException("close() was already called");
-        // Mark as closed. No other actions allowed after that
-        if (sendRemaining) closeStatus = CloseStatus.CloseAfterRemaining;
-        else closeStatus = CloseStatus.CloseNow;
+	/**
+	 * Tries to schedule a runnable on the underlying executor.<br>
+	 * Rejected executions will be suppressed.<br>
+	 * This is useful for cases when the clients EventLoop is shut down before
+	 * the EventLoop of the underlying connection.
+	 *
+	 * @param action The action to schedule.
+	 */
+	private void tryScheduleAction( Runnable action )
+	{
+		try
+		{
+			scheduler.submit( action );
+		}
+		catch ( RejectedExecutionException e )
+		{
+		}
+	}
 
-        // Avoid forwarding of new incoming messages
-        forwardIncoming = false;
+	// IWampConnection members
 
-        closeStatus = CloseStatus.CloseSent;
-        connection.close(true, promise);
-    }
-    
-    // IWampConnectionListener methods
+	@Override
+	public WampSerialization serialization()
+	{
+		return connection.serialization();
+	}
 
-    @Override
-    public void transportClosed() {
-        tryScheduleAction(new Runnable() {
-            @Override
-            public void run() {
-                // Avoid forwarding more than once
-                if (!forwardIncoming) return;
-                forwardIncoming = false;
-                
-                connectionListener.transportClosed();
-            }
-        });
-    }
+	@Override
+	public boolean isSingleWriteOnly()
+	{
+		return false;
+	}
 
-    @Override
-    public void transportError(final Throwable cause) {
-        tryScheduleAction(new Runnable() {
-            @Override
-            public void run() {
-                // Avoid forwarding more than once
-                if (!forwardIncoming) return;
-                forwardIncoming = false;
-                
-                connectionListener.transportError(cause);
-            }
-        });
-    }
+	@Override
+	public void sendMessage( WampMessage message, IWampConnectionPromise<Void> promise )
+	{
+		if ( closeStatus != CloseStatus.None )
+			throw new IllegalStateException( "close() was already called" );
 
-    @Override
-    public void messageReceived(final WampMessage message) {
-        tryScheduleAction(new Runnable() {
-            @Override
-            public void run() {
-                // Drop messages that arrive after close
-                if (!forwardIncoming) return;
-                
-                connectionListener.messageReceived(message);
-            }
-        });
-    }
+		connection.sendMessage( message, promise );
+		if ( !flushList.contains( connection ) )
+			flushList.add( connection );
+	}
 
-    @Override
-    public void readCompleted(){
-        tryScheduleAction(new Runnable() {
-            @Override
-            public void run() {
-                for(IWampConnection connection : flushList){
-                    connection.flush();
-                }
-                flushList.clear();
-            }
-        });
-    }
+	@Override
+	public void close( boolean sendRemaining, IWampConnectionPromise<Void> promise )
+	{
+		if ( closeStatus != CloseStatus.None )
+			throw new IllegalStateException( "close() was already called" );
+		// Mark as closed. No other actions allowed after that
+		if ( sendRemaining ) closeStatus = CloseStatus.CloseAfterRemaining;
+		else closeStatus = CloseStatus.CloseNow;
 
-    @Override
-    public void flush(){
-        connection.flush();
-    }
+		// Avoid forwarding of new incoming messages
+		forwardIncoming = false;
+
+		closeStatus = CloseStatus.CloseSent;
+		connection.close( true, promise );
+	}
+
+	// IWampConnectionListener methods
+
+	@Override
+	public void transportClosed()
+	{
+		tryScheduleAction( new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				// Avoid forwarding more than once
+				if ( !forwardIncoming ) return;
+				forwardIncoming = false;
+
+				connectionListener.transportClosed();
+			}
+		} );
+	}
+
+	@Override
+	public void transportError( final Throwable cause )
+	{
+		tryScheduleAction( new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				// Avoid forwarding more than once
+				if ( !forwardIncoming ) return;
+				forwardIncoming = false;
+
+				connectionListener.transportError( cause );
+			}
+		} );
+	}
+
+	@Override
+	public void messageReceived( final WampMessage message )
+	{
+		tryScheduleAction( new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				// Drop messages that arrive after close
+				if ( !forwardIncoming ) return;
+
+				connectionListener.messageReceived( message );
+			}
+		} );
+	}
+
+	@Override
+	public void readCompleted()
+	{
+		tryScheduleAction( new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				for ( IWampConnection connection : flushList )
+				{
+					connection.flush();
+				}
+				flushList.clear();
+			}
+		} );
+	}
+
+	@Override
+	public void flush()
+	{
+		connection.flush();
+	}
 }

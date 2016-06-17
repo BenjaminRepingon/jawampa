@@ -19,22 +19,25 @@ package ws.wamp.jawampa;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class Reply {
-    
-    final ArrayNode arguments;
-    final ObjectNode keywordArguments;
-    
-    public ArrayNode arguments() {
-        return arguments;
-    }
-    
-    public ObjectNode keywordArguments() {
-        return keywordArguments;
-    }
+public class Reply
+{
+	private final ArrayNode  arguments;
+	private final ObjectNode keywordArguments;
 
-    public Reply(ArrayNode arguments, ObjectNode keywordArguments) {
-        this.arguments = arguments;
-        this.keywordArguments = keywordArguments;
-    }
+	public ArrayNode arguments()
+	{
+		return arguments;
+	}
+
+	public ObjectNode keywordArguments()
+	{
+		return keywordArguments;
+	}
+
+	public Reply( ArrayNode arguments, ObjectNode keywordArguments )
+	{
+		this.arguments = arguments;
+		this.keywordArguments = keywordArguments;
+	}
 
 }

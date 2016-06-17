@@ -16,12 +16,7 @@
 
 package ws.wamp.jawampa.client;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ws.wamp.jawampa.WampRoles;
@@ -30,141 +25,182 @@ import ws.wamp.jawampa.connection.IWampConnector;
 import ws.wamp.jawampa.connection.IWampConnectorProvider;
 import ws.wamp.jawampa.internal.Version;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Stores various configuration data for WAMP clients
  */
-public class ClientConfiguration {
-    final boolean closeClientOnErrors;
-    
-    final String authId;
-    final List<ClientSideAuthentication> authMethods;
-    
-    final ObjectMapper objectMapper = new ObjectMapper();
+public class ClientConfiguration
+{
+	private final boolean closeClientOnErrors;
 
-    final URI routerUri;
-    final String realm;
-    final boolean useStrictUriValidation;
-    
-    final WampRoles[] clientRoles;
-    
-    final int totalNrReconnects;
-    final int reconnectInterval;
-    
-    /** The provider that should be used to obtain a connector */
-    final IWampConnectorProvider connectorProvider;
-    /** The connector which is used to create new connections to the remote peer */
-    final IWampConnector connector;
+	private final String                         authId;
+	private final List<ClientSideAuthentication> authMethods;
 
-    final ObjectNode helloDetails;
-    
-    public ClientConfiguration(
-        boolean closeClientOnErrors,
-        String authId,
-        List<ClientSideAuthentication> authMethods,
-        URI routerUri,
-        String realm,
-        boolean useStrictUriValidation,
-        WampRoles[] clientRoles,
-        int totalNrReconnects,
-        int reconnectInterval,
-        IWampConnectorProvider connectorProvider,
-        IWampConnector connector)
-    {
-        this.closeClientOnErrors = closeClientOnErrors;
-        
-        this.authId = authId;
-        this.authMethods = authMethods;
-        
-        this.routerUri = routerUri;
-        this.realm = realm;
-        
-        this.useStrictUriValidation = useStrictUriValidation;
-        
-        this.clientRoles = clientRoles;
-        
-        this.totalNrReconnects = totalNrReconnects;
-        this.reconnectInterval = reconnectInterval;
-        
-        this.connectorProvider = connectorProvider;
-        this.connector = connector;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
-        // Put the requested roles in the Hello message
-        helloDetails = objectMapper.createObjectNode();
-        helloDetails.put("agent", Version.getVersion());
+	private final URI     routerUri;
+	private final String  realm;
+	private final boolean useStrictUriValidation;
 
-        ObjectNode rolesNode = helloDetails.putObject("roles");
-        for (WampRoles role : clientRoles) {
-            ObjectNode roleNode = rolesNode.putObject(role.toString());
-            if (role == WampRoles.Publisher ) {
-                ObjectNode featuresNode = roleNode.putObject("features");
-                featuresNode.put("publisher_exclusion", true);
-            } else if (role == WampRoles.Subscriber) {
-                ObjectNode featuresNode = roleNode.putObject("features");
-                featuresNode.put("pattern_based_subscription", true);
-            } else if (role == WampRoles.Caller) {
-                ObjectNode featuresNode = roleNode.putObject("features");
-                featuresNode.put("caller_identification", true);
-            }
-        }
+	private final WampRoles[] clientRoles;
 
-        // Insert authentication data
-        if(authId != null) {
-            helloDetails.put("authid", authId);
-        }
-        if (authMethods != null && authMethods.size() != 0) {
-            ArrayNode authMethodsNode = helloDetails.putArray("authmethods");
-            for(ClientSideAuthentication authMethod : authMethods) {
-                authMethodsNode.add(authMethod.getAuthMethod());
-            }
-        }
-    }
-    
-    public boolean closeClientOnErrors() {
-        return closeClientOnErrors;
-    }
-    
-    public ObjectMapper objectMapper() {
-        return objectMapper;
-    }
-    
-    public URI routerUri() {
-        return routerUri;
-    }
-    
-    public String realm() {
-        return realm;
-    }
-    
-    public boolean useStrictUriValidation() {
-        return useStrictUriValidation;
-    }
-    
-    public int totalNrReconnects() {
-        return totalNrReconnects;
-    }
-    
-    public int reconnectInterval() {
-        return reconnectInterval;
-    }
-    
-    /** The connector which is used to create new connections to the remote peer */
-    public IWampConnector connector() {
-        return connector;
-    }
+	private final int totalNrReconnects;
+	private final int reconnectInterval;
 
-    public WampRoles[] clientRoles() {
-        return clientRoles.clone();
-    }
-    
-    public String authId() {
-        return authId;
-    }
-    
-    public List<ClientSideAuthentication> authMethods() {
-        return new ArrayList<ClientSideAuthentication>(authMethods);
-    }
+	/**
+	 * The provider that should be used to obtain a connector
+	 */
+	private final IWampConnectorProvider connectorProvider;
 
-    ObjectNode helloDetails(){
-        return helloDetails;
-    }
+	/**
+	 * The connector which is used to create new connections to the remote peer
+	 */
+	private final IWampConnector         connector;
+
+	private final ObjectNode helloDetails;
+
+	public ClientConfiguration(
+			boolean closeClientOnErrors,
+			String authId,
+			List<ClientSideAuthentication> authMethods,
+			URI routerUri,
+			String realm,
+			boolean useStrictUriValidation,
+			WampRoles[] clientRoles,
+			int totalNrReconnects,
+			int reconnectInterval,
+			IWampConnectorProvider connectorProvider,
+			IWampConnector connector )
+	{
+		this.closeClientOnErrors = closeClientOnErrors;
+
+		this.authId = authId;
+		this.authMethods = authMethods;
+
+		this.routerUri = routerUri;
+		this.realm = realm;
+
+		this.useStrictUriValidation = useStrictUriValidation;
+
+		this.clientRoles = clientRoles;
+
+		this.totalNrReconnects = totalNrReconnects;
+		this.reconnectInterval = reconnectInterval;
+
+		this.connectorProvider = connectorProvider;
+		this.connector = connector;
+
+		// Put the requested roles in the Hello message
+		helloDetails = objectMapper.createObjectNode();
+		helloDetails.put( "agent", Version.getVersion() );
+
+		ObjectNode rolesNode = helloDetails.putObject( "roles" );
+		for ( WampRoles role : clientRoles )
+		{
+			ObjectNode roleNode = rolesNode.putObject( role.toString() );
+			if ( role == WampRoles.Publisher )
+			{
+				ObjectNode featuresNode = roleNode.putObject( "features" );
+				featuresNode.put( "publisher_exclusion", true );
+			}
+			else if ( role == WampRoles.Subscriber )
+			{
+				ObjectNode featuresNode = roleNode.putObject( "features" );
+				featuresNode.put( "pattern_based_subscription", true );
+			}
+			else if ( role == WampRoles.Caller )
+			{
+				ObjectNode featuresNode = roleNode.putObject( "features" );
+				featuresNode.put( "caller_identification", true );
+			}
+		}
+
+		// Insert authentication data
+		if ( authId != null )
+		{
+			helloDetails.put( "authid", authId );
+		}
+		if ( authMethods != null && authMethods.size() != 0 )
+		{
+			ArrayNode authMethodsNode = helloDetails.putArray( "authmethods" );
+			for ( ClientSideAuthentication authMethod : authMethods )
+			{
+				authMethodsNode.add( authMethod.getAuthMethod() );
+			}
+		}
+	}
+
+	public boolean closeClientOnErrors()
+	{
+		return closeClientOnErrors;
+	}
+
+	public ObjectMapper objectMapper()
+	{
+		return objectMapper;
+	}
+
+	public URI routerUri()
+	{
+		return routerUri;
+	}
+
+	public String realm()
+	{
+		return realm;
+	}
+
+	public boolean useStrictUriValidation()
+	{
+		return useStrictUriValidation;
+	}
+
+	public int totalNrReconnects()
+	{
+		return totalNrReconnects;
+	}
+
+	public int reconnectInterval()
+	{
+		return reconnectInterval;
+	}
+
+	/**
+	 * @return The provider that should be used to obtain a connector
+	 */
+	public IWampConnectorProvider connectorProvider()
+	{
+		return connectorProvider;
+	}
+
+	/**
+	 * @return The connector which is used to create new connections to the remote peer
+	 */
+	public IWampConnector connector()
+	{
+		return connector;
+	}
+
+	public WampRoles[] clientRoles()
+	{
+		return clientRoles.clone();
+	}
+
+	public String authId()
+	{
+		return authId;
+	}
+
+	public List<ClientSideAuthentication> authMethods()
+	{
+		return new ArrayList<ClientSideAuthentication>( authMethods );
+	}
+
+	ObjectNode helloDetails()
+	{
+		return helloDetails;
+	}
 }

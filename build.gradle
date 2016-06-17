@@ -4,6 +4,9 @@ allprojects {
     apply plugin: 'groovy'
     apply plugin: 'java'
 
+    targetCompatibility = '1.6'
+    sourceCompatibility = '1.6'
+
     group 'ws.wamp.jawampa'
     version '0.5.2'
 }

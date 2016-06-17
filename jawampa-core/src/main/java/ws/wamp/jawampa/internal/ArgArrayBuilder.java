@@ -23,21 +23,26 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
  * Utility class to build a Jackson argument array out of an arbitrary list
  * of positional arguments.
  */
-public class ArgArrayBuilder {
-    /**
-     * Builds an ArrayNode from all positional arguments in a WAMP message.<br>
-     * If there are no positional arguments then null will be returned, as
-     * WAMP requires no empty arguments list to be transmitted.
-     * @param args All positional arguments
-     * @return An ArrayNode containing positional arguments or null
-     */
-    public static ArrayNode buildArgumentsArray(ObjectMapper objectMapper, Object... args) {
-        if (args.length == 0) return null;
-        // Build the arguments array and serialize the arguments
-        final ArrayNode argArray = objectMapper.createArrayNode();
-        for (Object arg : args) {
-            argArray.addPOJO(arg);
-        }
-        return argArray;
-    }
+public class ArgArrayBuilder
+{
+	/**
+	 * Builds an ArrayNode from all positional arguments in a WAMP message.<br>
+	 * If there are no positional arguments then null will be returned, as
+	 * WAMP requires no empty arguments list to be transmitted.
+	 *
+	 * @param objectMapper The object mapper
+	 * @param args All positional arguments
+	 * @return An ArrayNode containing positional arguments or null
+	 */
+	public static ArrayNode buildArgumentsArray( ObjectMapper objectMapper, Object... args )
+	{
+		if ( args.length == 0 ) return null;
+		// Build the arguments array and serialize the arguments
+		final ArrayNode argArray = objectMapper.createArrayNode();
+		for ( Object arg : args )
+		{
+			argArray.addPOJO( arg );
+		}
+		return argArray;
+	}
 }

@@ -27,69 +27,87 @@ import java.util.List;
 /**
  * Possible serialization methods for WAMP
  */
-public enum WampSerialization {
-    /** Used for cases where the serialization could not be negotiated */
-    Invalid("", true, null),
-    /** Use the JSON serialization */
-    Json("wamp.2.json", true, new ObjectMapper()),
-    /** Use the MessagePack serialization */
-    MessagePack("wamp.2.msgpack", false, new ObjectMapper(new MessagePackFactory()));
+public enum WampSerialization
+{
+	/**
+	 * Used for cases where the serialization could not be negotiated
+	 */
+	Invalid( "", true, null ),
+	/**
+	 * Use the JSON serialization
+	 */
+	Json( "wamp.2.json", true, new ObjectMapper() ),
+	/**
+	 * Use the MessagePack serialization
+	 */
+	MessagePack( "wamp.2.msgpack", false, new ObjectMapper( new MessagePackFactory() ) );
 
-    private final String stringValue;
-    private final boolean isText;
-    private final ObjectMapper objectMapper;
+	private final String       stringValue;
+	private final boolean      isText;
+	private final ObjectMapper objectMapper;
 
-    WampSerialization(String stringValue, boolean isText, ObjectMapper objectMapper) {
-        this.stringValue = stringValue;
-        this.isText = isText;
-        this.objectMapper = objectMapper;
-    }
+	WampSerialization( String stringValue, boolean isText, ObjectMapper objectMapper )
+	{
+		this.stringValue = stringValue;
+		this.isText = isText;
+		this.objectMapper = objectMapper;
+	}
 
-    public boolean isText() {
-        return isText;
-    }
+	public boolean isText()
+	{
+		return isText;
+	}
 
-    public ObjectMapper getObjectMapper() {
-        return objectMapper;
-    }
+	public ObjectMapper getObjectMapper()
+	{
+		return objectMapper;
+	}
 
-    @Override
-    public String toString() {
-        return stringValue;
-    }
+	@Override
+	public String toString()
+	{
+		return stringValue;
+	}
 
-    public static WampSerialization fromString(String serialization) {
-        if (serialization == null) return Invalid;
-        else if (serialization.equals("wamp.2.json")) return Json;
-        else if (serialization.equals("wamp.2.msgpack")) return MessagePack;
-        return Invalid;
-    }
-    
-    public static String makeWebsocketSubprotocolList(List<WampSerialization> serializations) {
-        StringBuilder subProtocolBuilder = new StringBuilder();
-        boolean first = true;
-        for (WampSerialization serialization : serializations) {
-            if (!first) subProtocolBuilder.append(',');
-            first = false;
-            subProtocolBuilder.append(serialization.toString());
-        }
+	public static WampSerialization fromString( String serialization )
+	{
+		if ( serialization == null ) return Invalid;
+		else if ( serialization.equals( "wamp.2.json" ) ) return Json;
+		else if ( serialization.equals( "wamp.2.msgpack" ) ) return MessagePack;
+		return Invalid;
+	}
 
-        return subProtocolBuilder.toString();
-    }
+	public static String makeWebsocketSubprotocolList( List<WampSerialization> serializations )
+	{
+		StringBuilder subProtocolBuilder = new StringBuilder();
+		boolean first = true;
+		for ( WampSerialization serialization : serializations )
+		{
+			if ( !first ) subProtocolBuilder.append( ',' );
+			first = false;
+			subProtocolBuilder.append( serialization.toString() );
+		}
 
-    public static void addDefaultSerializations(List<WampSerialization> serializations) {
-        serializations.add(Json);
-        serializations.add(MessagePack);
-    }
-    
-    private final static List<WampSerialization> defaultSerializationList;
-    static {
-        List<WampSerialization> l = new ArrayList<WampSerialization>();
-        addDefaultSerializations(l);
-        defaultSerializationList = Collections.unmodifiableList(l);
-    }
-    
-    public static List<WampSerialization> defaultSerializations() {
-         return defaultSerializationList;
-    }
+		return subProtocolBuilder.toString();
+	}
+
+	public static void addDefaultSerializations( List<WampSerialization> serializations )
+	{
+		serializations.add( Json );
+		serializations.add( MessagePack );
+	}
+
+	private final static List<WampSerialization> defaultSerializationList;
+
+	static
+	{
+		List<WampSerialization> l = new ArrayList<WampSerialization>();
+		addDefaultSerializations( l );
+		defaultSerializationList = Collections.unmodifiableList( l );
+	}
+
+	public static List<WampSerialization> defaultSerializations()
+	{
+		return defaultSerializationList;
+	}
 }

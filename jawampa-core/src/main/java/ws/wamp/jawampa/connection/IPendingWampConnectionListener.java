@@ -21,12 +21,19 @@ package ws.wamp.jawampa.connection;
  * Once the connection is established one of the callback methods that this
  * listener provides will be called.
  */
-public interface IPendingWampConnectionListener {
-    /** The connection succeeded */
-    void connectSucceeded(IWampConnection connection);
-    
-    /**
-     * The connection of the transport failed or the connection was cancelled.
-     */
-    void connectFailed(Throwable cause);
+public interface IPendingWampConnectionListener
+{
+	/**
+	 * The connection succeeded
+	 *
+	 * @param connection The connection has succeeded
+	 */
+	void connectSucceeded( IWampConnection connection );
+
+	/**
+	 * The connection of the transport failed or the connection was cancelled.
+	 *
+	 * @param cause The cause of the failed
+	 */
+	void connectFailed( Throwable cause );
 }
